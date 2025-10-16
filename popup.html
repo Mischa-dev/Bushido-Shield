@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,40 +7,77 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <img src="icons/icon32.png" alt="" width="20" height="20">
-      <h1>Bushido Shield</h1>
-    </header>
-    <section class="site-toggle">
-      <div class="site-info">
-        <div id="origin">—</div>
-      </div>
-      <button id="toggleBtn" class="toggle off" aria-pressed="false">
-        <span class="label">Block on this site</span>
-        <span class="state">OFF</span>
-      </button>
-    </section>
-    <section class="quick">
-      <div class="row">
-        <label for="mode">Mode</label>
-        <select id="mode">
-          <option>Default</option>
-          <option>School</option>
-          <option>Focus</option>
-        </select>
-      </div>
-      <div class="row">
-        <div class="device">
-          <span id="deviceName">This device</span>
+  <div class="app">
+    <aside class="sidebar" aria-label="Bushido Shield navigation">
+      <div class="brand">
+        <img src="icons/icon32.png" alt="Bushido Shield" width="28" height="28" />
+        <div class="brand-copy">
+          <span class="name">Bushido Shield</span>
+          <span class="tagline">Household ad guard</span>
         </div>
-        <button id="openOptions" class="link">Open dashboard</button>
       </div>
-    </section>
-    <footer>
-      <small>MVP preview — rules are client-side only.</small>
-    </footer>
+      <nav class="nav" aria-label="Pages">
+        <div class="nav-group" role="tablist">
+          <button class="nav-item active" data-target="home" role="tab" aria-selected="true">Home</button>
+          <button class="nav-item" data-target="devices" role="tab" aria-selected="false">Devices</button>
+        </div>
+        <button class="nav-item nav-link" id="openOptions" type="button">Open dashboard</button>
+      </nav>
+      <div class="mode-summary">
+        <span class="label">Current mode</span>
+        <span class="value" id="modeLabel">—</span>
+      </div>
+    </aside>
+    <main class="view">
+      <section class="page active" id="home" aria-labelledby="home">
+        <div class="hero">
+          <button id="toggleBtn" class="power off" aria-pressed="false">
+            <span class="ring"></span>
+            <span class="indicator"></span>
+            <span class="state">OFF</span>
+          </button>
+          <div class="status-text">
+            <h2 id="origin">—</h2>
+            <p class="muted">Toggles ad blocking for this site.</p>
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="card">
+            <h3>Mode</h3>
+            <p class="muted">Choose how strict Bushido Shield should be.</p>
+            <label class="select">
+              <span>Global mode</span>
+              <select id="mode">
+                <option value="Default">Normal</option>
+                <option value="School">School</option>
+                <option value="Focus">Focus</option>
+                <option value="Sleep">Sleep</option>
+                <option value="Custom">Custom</option>
+                <option value="Travel">Travel</option>
+                <option value="Gaming">Gaming</option>
+                <option value="Reading">Reading</option>
+              </select>
+            </label>
+          </div>
+          <div class="card">
+            <h3>Device</h3>
+            <p class="muted">Applies to the device currently using this browser.</p>
+            <div class="device-chip" id="deviceName">This device</div>
+          </div>
+        </div>
+      </section>
+      <section class="page" id="devices" aria-labelledby="devices">
+        <header class="page-header">
+          <h2>Devices on your network</h2>
+          <p class="muted">Preview of how Bushido Shield will manage each family device.</p>
+        </header>
+        <div class="device-list" id="deviceList" aria-live="polite"></div>
+      </section>
+    </main>
   </div>
+  <footer class="footer">
+    <small>Design preview — data is local to this browser only.</small>
+  </footer>
   <script src="popup.js" type="module"></script>
 </body>
 </html>
