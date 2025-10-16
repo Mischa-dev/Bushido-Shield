@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bushido Shield</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img src="icons/icon32.png" alt="" width="20" height="20">
+      <h1>Bushido Shield</h1>
+    </header>
+    <section class="site-toggle">
+      <div class="site-info">
+        <div id="origin">—</div>
+      </div>
+      <button id="toggleBtn" class="toggle off" aria-pressed="false">
+        <span class="label">Block on this site</span>
+        <span class="state">OFF</span>
+      </button>
+    </section>
+    <section class="quick">
+      <div class="row">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option>Default</option>
+          <option>School</option>
+          <option>Focus</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="device">
+          <span id="deviceName">This device</span>
+        </div>
+        <button id="openOptions" class="link">Open dashboard</button>
+      </div>
+    </section>
+    <footer>
+      <small>MVP preview — rules are client-side only.</small>
+    </footer>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

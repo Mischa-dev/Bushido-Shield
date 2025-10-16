@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bushido Shield — Dashboard (MVP)</title>
+  <style>
+    body{font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;margin:0;color:#0f172a}
+    header{padding:14px 16px;background:#0f172a;color:white;display:flex;align-items:center;gap:10px}
+    main{padding:16px;max-width:900px}
+    .card{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:12px 0;background:#fff}
+    .muted{color:#475569}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}
+    th{background:#f8fafc}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" width="24" height="24" alt="">
+    <h1 style="margin:0;font-size:18px;">Bushido Shield — Dashboard (MVP)</h1>
+  </header>
+  <main>
+    <div class="card">
+      <h2 style="margin:4px 0;">Devices</h2>
+      <p class="muted">For now, this MVP tracks only <strong>this device</strong>. Later, you'll see every household device here and assign modes.</p>
+      <div id="deviceBlock"></div>
+    </div>
+    <div class="card">
+      <h2 style="margin:4px 0;">Per‑site settings (this device)</h2>
+      <table id="sitesTable">
+        <thead><tr><th>Origin</th><th>Blocking</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2 style="margin:4px 0;">Modes</h2>
+      <p class="muted">Modes affect behavior on every site. <strong>Focus</strong> blocks social/video domains with a friendly overlay.</p>
+      <label>Mode:
+        <select id="mode">
+          <option>Default</option>
+          <option>School</option>
+          <option>Focus</option>
+        </select>
+      </label>
+    </div>
+  </main>
+  <script src="options.js" type="module"></script>
+</body>
+</html>
