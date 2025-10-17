@@ -10,7 +10,12 @@
   <div class="app">
     <aside class="sidebar" aria-label="Bushido Shield navigation">
       <div class="brand">
-        <img src="icons/icon32.png" alt="Bushido Shield" width="28" height="28" />
+        <!-- Inline SVG icon to avoid external file dependency -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="#0f172a" />
+          <path d="M6 10c2-2 5-3 8-3s6 1 8 3v4c-2 2-5 3-8 3s-6-1-8-3v-4z" fill="#10b981" opacity="0.95" />
+          <circle cx="12" cy="9" r="1.5" fill="#fff" />
+        </svg>
         <div class="brand-copy">
           <span class="name">Bushido Shield</span>
           <span class="tagline">Household ad guard</span>

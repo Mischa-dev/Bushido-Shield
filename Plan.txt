@@ -1,1 +1,1 @@
-TODO: We need to overhaul the UI to make it look as polished as possible. Remember, this is for a small extension popup, so everything must be well spaced and easy to use.
+#TODO: We need to overhaul the UI to make it look as polished as possible. Remember, this is for a small extension popup, so everything must be well spaced and easy to use.
