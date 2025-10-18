@@ -4,100 +4,132 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bushido Shield</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="popup.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com;"
+  />
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar" aria-label="Bushido Shield navigation">
+  <div id="popup">
+    <header class="header">
       <div class="brand">
-        <!-- Inline SVG icon to avoid external file dependency -->
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect width="24" height="24" rx="4" fill="#0f172a" />
-          <path d="M6 10c2-2 5-3 8-3s6 1 8 3v4c-2 2-5 3-8 3s-6-1-8-3v-4z" fill="#10b981" opacity="0.95" />
-          <circle cx="12" cy="9" r="1.5" fill="#fff" />
-        </svg>
-        <div class="brand-copy">
-          <span class="name">Bushido Shield</span>
-          <span class="tagline">Household ad guard</span>
+        <img src="bushido_shield_logo.svg" alt="Bushido Shield logo" class="brand__logo" width="40" height="40" />
+        <div class="brand__copy">
+          <span class="brand__name">Bushido Shield</span>
+          <span class="brand__tagline">Friendly protection</span>
         </div>
       </div>
-      <nav class="nav" aria-label="Pages">
-        <div class="nav-group" role="tablist">
-          <button class="nav-item active" data-target="home" role="tab" aria-selected="true">Home</button>
-          <button class="nav-item" data-target="devices" role="tab" aria-selected="false">Devices</button>
-        </div>
-        <button class="nav-item nav-link" id="openOptions" type="button">Open dashboard</button>
-      </nav>
-      <div class="mode-summary">
-        <span class="label">Current mode</span>
-        <span class="value" id="modeLabel">—</span>
-      </div>
-    </aside>
-    <main class="view">
-      <section class="page active" id="home" aria-labelledby="home">
-        <div class="hero">
-          <button id="toggleBtn" class="power off" aria-pressed="false">
-            <span class="ring"></span>
-            <span class="indicator"></span>
-            <span class="state">OFF</span>
+      <div class="header__actions">
+        <span id="statusPill" class="pill pill--ok">Connected</span>
+        <div class="menu">
+          <button id="menuButton" class="menu__toggle" aria-haspopup="true" aria-expanded="false">
+            <span class="menu__text">Menu</span>
+            <span aria-hidden="true">⋮</span>
           </button>
-          <div class="status-text">
-            <h2 id="origin">—</h2>
-            <p class="muted">Toggles ad blocking for this site.</p>
+          <div id="menuList" class="menu__list" role="menu">
+            <button type="button" class="menu__item" role="menuitem" data-action="dashboard">Open dashboard</button>
+            <button type="button" class="menu__item" role="menuitem" data-action="options">Options</button>
+            <button type="button" class="menu__item" role="menuitem" data-action="pause" id="menuPause">Pause 15m</button>
           </div>
         </div>
-        <div class="info-grid">
-          <div class="card">
-            <h3>Mode</h3>
-            <p class="muted">Choose how strict Bushido Shield should be.</p>
-            <label class="select">
-              <span>Global mode</span>
-              <select id="mode">
-                <option value="Default">Normal</option>
-                <option value="School">School</option>
-                <option value="Focus">Focus</option>
-                <option value="Sleep">Sleep</option>
-                <option value="Custom">Custom</option>
-                <option value="Travel">Travel</option>
-                <option value="Gaming">Gaming</option>
-                <option value="Reading">Reading</option>
-              </select>
-            </label>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Popup views">
+      <button id="tab-home" class="tab is-active" role="tab" aria-selected="true" data-target="view-home">Home</button>
+      <button id="tab-devices" class="tab" role="tab" aria-selected="false" data-target="view-devices">Devices</button>
+    </nav>
+
+    <main class="content">
+      <section id="view-home" class="view is-active" role="tabpanel" aria-labelledby="tab-home">
+        <div class="panel panel--home">
+          <div class="dial">
+            <button
+              id="toggleBtn"
+              class="dial__button"
+              role="switch"
+              aria-checked="false"
+              title="Turn protection on/off for this site"
+            >
+              <span class="dial__glow" aria-hidden="true"></span>
+              <span class="dial__label" id="dialLabel">OFF</span>
+            </button>
+            <p class="helper">Blocks ads &amp; trackers on this site.</p>
           </div>
-          <div class="card">
-            <h3>Device</h3>
-            <p class="muted">Applies to the device currently using this browser.</p>
-            <div class="device-chip" id="deviceName">This device</div>
-          </div>
-          <div class="card stats-card" aria-live="polite">
-            <h3>Shield stats</h3>
-            <p class="muted">Live network filtering metrics for this browser.</p>
-            <div class="stat-grid" role="group" aria-label="Requests blocked summary">
-              <div class="stat">
-                <span class="stat-value" id="blockedToday">0</span>
-                <span class="stat-label">Today</span>
-              </div>
-              <div class="stat">
-                <span class="stat-value" id="blockedTotal">0</span>
-                <span class="stat-label">All time</span>
+
+          <div class="home-meta">
+            <div class="mode">
+              <label class="field">
+                <span class="label">Profile</span>
+                <div class="select">
+                  <select id="mode" aria-label="Select profile">
+                    <option value="Default">Normal</option>
+                    <option value="School">School</option>
+                    <option value="Focus">Focus</option>
+                    <option value="Sleep">Sleep</option>
+                    <option value="Custom">Custom</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Gaming">Gaming</option>
+                    <option value="Reading">Reading</option>
+                  </select>
+                </div>
+              </label>
+              <div class="device-chip" id="deviceName" title="Current device">
+                <span class="label">Device</span>
+                <span class="device-chip__value">This device</span>
               </div>
             </div>
-            <p class="muted small" id="blocklistSummary">Checking blocklists…</p>
+
+            <div class="stats-row" id="statsRow" role="group" aria-label="Shield stats">
+              <div class="stat">
+                <span class="stat__label">Today</span>
+                <span class="stat__value" id="blockedToday">0</span>
+              </div>
+              <div class="stat">
+                <span class="stat__label">All time</span>
+                <span class="stat__value" id="blockedTotal">0</span>
+              </div>
+              <div class="stat stat--wide">
+                <span class="stat__label">Blocklists</span>
+                <span class="stat__value" id="blocklistSummary">Checking…</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="homePrimary" class="btn btn--primary" type="button">Pause 15m</button>
+            <button id="homeSecondary" class="btn btn--ghost" type="button">Open dashboard</button>
           </div>
         </div>
       </section>
-      <section class="page" id="devices" aria-labelledby="devices">
-        <header class="page-header">
-          <h2>Devices on your network</h2>
-          <p class="muted">Preview of how Bushido Shield will manage each family device.</p>
-        </header>
-        <div class="device-list" id="deviceList" aria-live="polite"></div>
+
+      <section id="view-devices" class="view" role="tabpanel" aria-labelledby="tab-devices">
+        <div class="panel panel--devices">
+          <header class="panel__header">
+            <h2 class="h2">Devices</h2>
+            <p class="muted">Top devices currently protected.</p>
+          </header>
+          <div id="deviceList" class="device-list" aria-live="polite"></div>
+          <button id="manageDevices" class="btn btn--ghost" type="button">Manage devices…</button>
+        </div>
       </section>
     </main>
+
+    <footer class="footer" aria-live="polite">
+      <span class="footer__item">Site: <span id="footerSite" class="footer__value">—</span></span>
+      <span class="footer__dot" aria-hidden="true">•</span>
+      <span class="footer__item">Profile: <span id="footerProfile" class="footer__value">Normal</span></span>
+    </footer>
   </div>
-  <footer class="footer">
-    <small>Design preview — data is local to this browser only.</small>
-  </footer>
+
+  <div id="toastRoot" class="toast-stack" aria-live="polite"></div>
   <script src="popup.js" type="module"></script>
 </body>
 </html>
