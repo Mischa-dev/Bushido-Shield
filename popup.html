@@ -69,6 +69,21 @@
             <p class="muted">Applies to the device currently using this browser.</p>
             <div class="device-chip" id="deviceName">This device</div>
           </div>
+          <div class="card stats-card" aria-live="polite">
+            <h3>Shield stats</h3>
+            <p class="muted">Live network filtering metrics for this browser.</p>
+            <div class="stat-grid" role="group" aria-label="Requests blocked summary">
+              <div class="stat">
+                <span class="stat-value" id="blockedToday">0</span>
+                <span class="stat-label">Today</span>
+              </div>
+              <div class="stat">
+                <span class="stat-value" id="blockedTotal">0</span>
+                <span class="stat-label">All time</span>
+              </div>
+            </div>
+            <p class="muted small" id="blocklistSummary">Checking blocklists…</p>
+          </div>
         </div>
       </section>
       <section class="page" id="devices" aria-labelledby="devices">

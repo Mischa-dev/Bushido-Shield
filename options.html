@@ -5,14 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bushido Shield — Dashboard (MVP)</title>
   <style>
-    body{font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;margin:0;color:#0f172a}
+    body{font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;margin:0;color:#0f172a;background:#f8fafc}
     header{padding:14px 16px;background:#0f172a;color:white;display:flex;align-items:center;gap:10px}
-    main{padding:16px;max-width:900px}
-    .card{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:12px 0;background:#fff}
-    .muted{color:#475569}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}
-    th{background:#f8fafc}
+    main{padding:16px;max-width:960px}
+    .card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;background:#fff;box-shadow:0 10px 24px rgba(15,23,42,.04)}
+    .card h2{margin:4px 0 6px}
+    .muted{color:#475569;font-size:14px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left;font-size:14px}
+    th{background:#f8fafc;text-transform:uppercase;font-size:12px;letter-spacing:.06em;color:#334155}
+    .toggle-list{display:grid;gap:10px;margin:14px 0}
+    .toggle-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:12px;border:1px solid #dbeafe;background:#eff6ff}
+    .toggle-item strong{font-size:15px}
+    .toggle-item span{font-size:13px;color:#475569}
+    .toggle-item input{width:20px;height:20px}
+    .custom-host-form{margin:16px 0}
+    .custom-host-form label{display:flex;flex-direction:column;gap:6px;font-weight:600;color:#0f172a}
+    .custom-host-form .input-group{display:flex;gap:8px}
+    .custom-host-form input{flex:1;padding:9px 12px;border-radius:10px;border:1px solid #cbd5f5;font:inherit}
+    .custom-host-form input:focus{outline:2px solid #0ea5e9;outline-offset:1px}
+    .custom-host-form button{padding:9px 16px;border-radius:10px;border:none;background:#0ea5e9;color:#fff;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,.25)}
+    .custom-host-form button:hover{background:#0284c7}
+    .custom-hosts{margin-top:12px}
+    .custom-hosts h3{margin:0 0 6px;font-size:15px}
+    .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#e2e8f0;font-size:13px;color:#0f172a}
+    .chip button{border:none;background:transparent;color:#0f172a;font-weight:700;cursor:pointer;font-size:13px}
+    .chip button:hover{color:#dc2626}
+    .reset-button{margin-top:12px;padding:9px 16px;border-radius:10px;border:1px solid #cbd5f5;background:#fff;font-weight:600;cursor:pointer;color:#0f172a}
+    .reset-button:hover{background:#f1f5f9}
+    .status-text{margin-top:10px;font-size:13px}
+    .status-text.warning{color:#f97316;font-weight:600}
+    .status-text.success{color:#047857;font-weight:600}
+    @media (max-width:700px){
+      main{padding:12px}
+      .card{padding:14px}
+    }
   </style>
 </head>
 <body>
@@ -53,6 +81,26 @@
           <option value="Reading">Reading</option>
         </select>
       </label>
+    </div>
+    <div class="card">
+      <h2>Network filtering</h2>
+      <p class="muted">These controls power Bushido Shield's DNS-style blocking using the browser's declarative rules engine.</p>
+      <div id="rulesetList" class="toggle-list" role="group" aria-label="Blocklist categories"></div>
+      <form id="customHostForm" class="custom-host-form">
+        <label for="customHostInput">Add a custom host or filter
+          <div class="input-group">
+            <input id="customHostInput" type="text" placeholder="ads.example.com or ||tracker.com^" autocomplete="off" />
+            <button type="submit">Add</button>
+          </div>
+        </label>
+      </form>
+      <div class="custom-hosts">
+        <h3>Custom blocklist</h3>
+        <p class="muted" id="customHostEmpty">No custom hosts yet. Add one above to extend protection.</p>
+        <ul id="customHostList" class="chip-list" aria-live="polite"></ul>
+      </div>
+      <button type="button" id="resetStatsBtn" class="reset-button">Reset blocked request counters</button>
+      <p class="muted status-text" id="blockingStatus"></p>
     </div>
   </main>
   <script src="options.js" type="module"></script>
