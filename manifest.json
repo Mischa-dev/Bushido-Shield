@@ -17,7 +17,9 @@
     "storage",
     "scripting",
     "activeTab",
-    "tabs"
+    "tabs",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -29,6 +31,30 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ads",
+        "path": "rules/ads.json",
+        "enabled": true
+      },
+      {
+        "id": "trackers",
+        "path": "rules/trackers.json",
+        "enabled": true
+      },
+      {
+        "id": "malware",
+        "path": "rules/malware.json",
+        "enabled": true
+      },
+      {
+        "id": "adult",
+        "path": "rules/adult.json",
+        "enabled": false
+      }
+    ]
   },
   "content_scripts": [
     {

@@ -334,6 +334,49 @@ body {
   font-weight: 600;
 }
 
+.stats-card {
+  gap: 16px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.muted.small {
+  font-size: 11px;
+  margin: 0;
+}
+
+.muted.small[data-status="warning"] {
+  color: #f97316;
+  font-weight: 600;
+}
+
 .page-header {
   display: grid;
   gap: 6px;

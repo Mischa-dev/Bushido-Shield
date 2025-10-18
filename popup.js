@@ -9,6 +9,9 @@ const deviceList = document.getElementById('deviceList');
 const modeLabel = document.getElementById('modeLabel');
 const navTabs = Array.from(document.querySelectorAll('.nav-item[data-target]'));
 const pages = Array.from(document.querySelectorAll('.page'));
+const blockedTodayEl = document.getElementById('blockedToday');
+const blockedTotalEl = document.getElementById('blockedTotal');
+const blocklistSummary = document.getElementById('blocklistSummary');
 
 const MODE_LABELS = {
   Default: 'Normal',
@@ -41,6 +44,11 @@ const DEFAULT_DEVICES = [
 
 let devices = [...DEFAULT_DEVICES];
 
+const formatNumber = (value) => {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric.toLocaleString() : '0';
+};
+
 function labelForMode(mode) {
   return MODE_LABELS[mode] || mode || MODE_LABELS.Default;
 }
@@ -57,6 +65,31 @@ function setModeUI(mode) {
   const fallback = modeSel.querySelector(`option[value="${mode}"]`) ? mode : 'Default';
   modeSel.value = fallback;
   modeLabel.textContent = labelForMode(fallback);
+}
+
+function updateBlockingSummary(blocking) {
+  if (!blockedTodayEl || !blockedTotalEl || !blocklistSummary) return;
+  const stats = blocking?.stats || {};
+  const todayCount = stats.daily && typeof stats.daily.count !== 'undefined' ? stats.daily.count : 0;
+  blockedTodayEl.textContent = formatNumber(todayCount);
+  blockedTotalEl.textContent = formatNumber(stats.totalBlocked);
+
+  if (!blocking) {
+    blocklistSummary.textContent = 'Unable to load blocklist summary.';
+    blocklistSummary.dataset.status = 'warning';
+    return;
+  }
+  if (!blocking.hasDnr) {
+    blocklistSummary.textContent = 'Network blocking unavailable in this browser.';
+    blocklistSummary.dataset.status = 'warning';
+    return;
+  }
+  const active = Array.isArray(blocking.activeRulesetIds) ? blocking.activeRulesetIds.length : 0;
+  const total = typeof blocking.totalRulesets === 'number' ? blocking.totalRulesets : active;
+  const customCount = Array.isArray(blocking.customBlocklist) ? blocking.customBlocklist.length : 0;
+  const hostSuffix = customCount === 1 ? '' : 's';
+  blocklistSummary.textContent = `${active} of ${total} blocklists active · ${customCount} custom host${hostSuffix}`;
+  blocklistSummary.dataset.status = 'ok';
 }
 
 function showPage(id) {
@@ -228,6 +261,7 @@ async function refresh() {
   setToggleUI(Boolean(res.enabled));
   setModeUI(res.mode || 'Default');
   deviceName.textContent = res.device || 'This device';
+  updateBlockingSummary(res.blocking);
 }
 
 navTabs.forEach((tab) => {
@@ -251,6 +285,7 @@ toggleBtn.addEventListener('click', async () => {
   try {
     const res = await API.runtime.sendMessage({ type: 'TOGGLE_SITE' });
     if (res && typeof res.enabled !== 'undefined') setToggleUI(res.enabled);
+    await refresh();
   } catch (e) {
     console.error('Unable to toggle site', e);
   }
@@ -264,6 +299,7 @@ modeSel.addEventListener('change', async () => {
     console.error('Unable to update mode', e);
   }
   setModeUI(value);
+  refresh().catch(console.error);
 });
 
 loadDevices().catch(console.error);

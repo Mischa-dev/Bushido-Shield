@@ -1,7 +1,7 @@
 // Bushido Shield - content script
 const API = typeof browser !== 'undefined' ? browser : chrome;
 
-let siteEnabled = false;
+let siteEnabled = true;
 let currentMode = "Default";
 
 const focusBlockedHosts = new Set([
@@ -34,12 +34,19 @@ function applyAdHidingCSS(active) {
     el.textContent = "";
     return;
   }
-  // Very conservative starter selectors for a demo; expand later.
+  // Expanded selectors inspired by popular DNS-level blockers to hide remaining placeholders.
   el.textContent = `
 /* Generic ad containers */
 [id*="ad-"], [id^="ad_"], [class*="ad-"], [class^="ad_"], [class*="advert"], [class*="adsbox"], [class*="sponsor"],
 iframe[src*="doubleclick.net"], iframe[src*="adservice.google.com"],
-iframe[src*="googlesyndication.com"], iframe[src*="adsystem"], iframe[src*="adnxs.com"] {
+iframe[src*="googlesyndication.com"], iframe[src*="adsystem"], iframe[src*="adnxs.com"],
+iframe[src*="advertising"], iframe[src*="taboola.com"], iframe[src*="outbrain.com"],
+[class*="__ad"], [class*="_ad"], [class*="-ad"], [class^="ads_"],
+[data-testid="ad"], [data-advertisement], [data-ad-rendered],
+[aria-label*="advertisement" i],
+/* Social widgets */
+[class*="sharethis"], [class*="follow-us"],
+[id*="sponsored" i], [class*="sponsored" i] {
   display: none !important;
   visibility: hidden !important;
   max-height: 0 !important;
@@ -48,6 +55,15 @@ iframe[src*="googlesyndication.com"], iframe[src*="adsystem"], iframe[src*="adnx
 }
 /* YouTube: hide ads/ticker-ish (non-breaking) */
 ytd-rich-section-renderer, ytd-ad-slot-renderer, ytd-player-legacy-desktop-watch-ads-renderer, .ytd-display-ad-renderer {
+  display: none !important;
+}
+/* News sites */
+[id*="ad_container"], [class*="ad-container"], [class*="ad-wrapper"],
+aside[class*="sponsored"], div[class*="sponsored"], section[class*="ad-slot"],
+div[class*="commercial"], section[class*="commercial"],
+div[data-google-av-done="1"],
+/* Placeholder collapse */
+[class*="ad-placeholder"], .ad-placeholder, .ad-slot, .adbanner, .adsbygoogle {
   display: none !important;
 }
 `;
@@ -104,3 +120,5 @@ API.runtime.onMessage.addListener((msg) => {
     render();
   }
 });
+
+render();
