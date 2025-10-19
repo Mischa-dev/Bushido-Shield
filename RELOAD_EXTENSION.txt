@@ -1,0 +1,29 @@
+🔄 EXTENSION RELOAD INSTRUCTIONS
+================================
+
+The code has been updated. To see the changes:
+
+1. Go to chrome://extensions/ (or brave://extensions/)
+2. Find "Bushido Shield"
+3. Click the RELOAD button (circular arrow icon)
+4. Close and reopen the extension popup/options page
+5. Hard refresh with Ctrl+Shift+R if needed
+
+Recent Changes Made:
+-------------------
+✅ Device name click now only updates Details panel (no tab switch)
+✅ Added "✏️ Rename" button in Details panel
+✅ Both use DataAPI for proper persistence
+✅ Added console.log for debugging clicks
+
+Test These:
+-----------
+1. Click a device name in Quick Devices → Details panel should update
+2. Click "✏️ Rename" button in Details panel → Prompt should appear
+3. Check browser console (F12) for "Device clicked:" logs
+
+If it still doesn't work:
+-------------------------
+- Clear browser cache (Ctrl+Shift+Delete)
+- Disable and re-enable the extension
+- Check console for JavaScript errors

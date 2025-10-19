@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Dashboard Fetch</title>
+</head>
+<body>
+  <h1>Dashboard API Test</h1>
+  <button id="testBtn">Test Fetch</button>
+  <pre id="output"></pre>
+
+  <script>
+    const output = document.getElementById('output');
+    const testBtn = document.getElementById('testBtn');
+
+    testBtn.addEventListener('click', async () => {
+      output.textContent = 'Testing...\n';
+      
+      const origins = [
+        'http://127.0.0.1:5179',
+        'http://localhost:5179'
+      ];
+
+      for (const origin of origins) {
+        const url = `${origin}/api/state`;
+        output.textContent += `\nTrying: ${url}\n`;
+        
+        try {
+          const response = await fetch(url);
+          output.textContent += `  Status: ${response.status} ${response.statusText}\n`;
+          
+          if (response.ok) {
+            const data = await response.json();
+            output.textContent += `  Success! Got ${data.devices?.length || 0} devices\n`;
+          } else {
+            const text = await response.text();
+            output.textContent += `  Error: ${text}\n`;
+          }
+        } catch (error) {
+          output.textContent += `  Failed: ${error.message}\n`;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

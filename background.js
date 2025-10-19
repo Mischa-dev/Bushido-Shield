@@ -3,6 +3,7 @@
 // Note: This is backend-agnostic. Later, wire to your Pi/AdGuard API.
 
 const API = typeof browser !== 'undefined' ? browser : chrome;
+const DASHBOARD_API = 'http://localhost:5179/api';
 
 const DEFAULT_STATE = {
   sites: {},
@@ -196,6 +197,15 @@ async function setDeviceMode(mode) {
   const st = await getStateWithDefaults();
   st.device.mode = mode;
   await setState(st);
+  try {
+    await fetch(`${DASHBOARD_API}/state`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeProfile: mode })
+    });
+  } catch (error) {
+    console.warn('Dashboard sync failed', error);
+  }
 }
 
 async function getActiveTab() {

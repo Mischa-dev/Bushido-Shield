@@ -1,496 +1,683 @@
-const BROWSER_API = typeof browser !== "undefined" ? browser : null;
-const CHROME_API = typeof chrome !== "undefined" ? chrome : null;
-const API = BROWSER_API || CHROME_API || {};
-const supportsPromiseMessaging = Boolean(BROWSER_API?.runtime?.sendMessage);
-
-const MODE_LABELS = {
-  Default: "Normal",
-  School: "School",
-  Focus: "Focus",
-  Sleep: "Sleep",
-  Custom: "Custom",
-  Travel: "Travel",
-  Gaming: "Gaming",
-  Reading: "Reading",
+﻿// BUSHIDO SHIELD POPUP
+const API_ORIGINS = ["http://127.0.0.1:5179", "http://localhost:5179"];
+const POPUP_CACHE_KEY = "popupCache";
+let preferredOrigin = null;
+let devices = [];
+let profiles = [];
+let isProtectionOn = true;
+let globalPauseUntil = null;
+let activeProfileId = null;
+let metrics = {
+  blockedToday: null,
+  blockedTotal: null,
+  activeLists: null
 };
+let quickStateReady = false;
 
-const DEVICE_MODE_OPTIONS = [
-  { value: "Default", label: "Normal" },
-  { value: "School", label: "School" },
-  { value: "Focus", label: "Focus" },
-  { value: "Sleep", label: "Sleep" },
-  { value: "Custom", label: "Custom" },
-  { value: "Travel", label: "Travel" },
-  { value: "Gaming", label: "Gaming" },
-  { value: "Reading", label: "Reading" },
-];
-
-const DEFAULT_DEVICES = [
-  { id: "this-browser", name: "This browser", type: "Laptop — Chromium", enabled: true, mode: "Default" },
-  { id: "emma-tablet", name: "Emma's iPad", type: "Tablet — Screen time", enabled: false, mode: "School" },
-  { id: "family-switch", name: "Family Switch", type: "Console — Living room", enabled: true, mode: "Gaming" },
-  { id: "guest-tv", name: "Guest TV", type: "Smart TV — Upstairs", enabled: false, mode: "Sleep" },
-  { id: "work-mbp", name: "Work MBP", type: "Laptop — Work", enabled: true, mode: "Focus" },
-];
-
-const toggleBtn = document.getElementById("toggleBtn");
-const dialLabel = document.getElementById("dialLabel");
-const statusPill = document.getElementById("statusPill");
-const modeSel = document.getElementById("mode");
-const deviceName = document.getElementById("deviceName");
-const homePrimary = document.getElementById("homePrimary");
-const homeSecondary = document.getElementById("homeSecondary");
-const manageDevices = document.getElementById("manageDevices");
-const footerSite = document.getElementById("footerSite");
-const footerProfile = document.getElementById("footerProfile");
-const blockedTodayEl = document.getElementById("blockedToday");
-const blockedTotalEl = document.getElementById("blockedTotal");
-const blocklistSummary = document.getElementById("blocklistSummary");
-const deviceList = document.getElementById("deviceList");
-const tabButtons = Array.from(document.querySelectorAll(".tab[data-target]"));
-const views = Array.from(document.querySelectorAll(".view"));
-const toastRoot = document.getElementById("toastRoot");
-
-const menu = document.querySelector(".menu");
-const menuButton = document.getElementById("menuButton");
-const menuList = document.getElementById("menuList");
-const menuPause = document.getElementById("menuPause");
-
-let devices = [...DEFAULT_DEVICES];
-let currentEnabled = true;
-let currentOrigin = null;
-let currentMode = "Default";
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const randomLatency = () => 150 + Math.floor(Math.random() * 150);
-
-function runtimeSendMessage(message) {
-  if (!API?.runtime?.sendMessage) {
-    return Promise.reject(new Error("Runtime messaging unavailable"));
-  }
-  if (supportsPromiseMessaging) {
-    return API.runtime.sendMessage(message);
-  }
-  return new Promise((resolve, reject) => {
-    API.runtime.sendMessage(message, (response) => {
-      const err = API.runtime.lastError;
-      if (err) {
-        reject(new Error(err.message));
-      } else {
-        resolve(response);
-      }
-    });
-  });
-}
-
-function toast(message) {
-  if (!toastRoot) return;
-  const el = document.createElement("div");
-  el.className = "toast";
-  el.textContent = message;
-  toastRoot.appendChild(el);
-  setTimeout(() => {
-    el.remove();
-  }, 2500);
-}
-
-async function withLatency(target, action) {
-  if (target) target.classList.add("is-loading");
-  try {
-    await wait(randomLatency());
-    return await action();
-  } finally {
-    if (target) target.classList.remove("is-loading");
-  }
-}
-
-function hostFromOrigin(origin) {
-  if (!origin) return "—";
-  try {
-    return new URL(origin).host;
-  } catch (e) {
-    return origin;
-  }
-}
-
-function labelForMode(mode) {
-  return MODE_LABELS[mode] || mode || MODE_LABELS.Default;
-}
-
-function updateStatusPill(enabled) {
-  if (!statusPill) return;
-  const label = enabled ? "Connected" : "Paused";
-  statusPill.textContent = label;
-  statusPill.classList.toggle("pill--ok", enabled);
-  statusPill.classList.toggle("pill--paused", !enabled);
-  statusPill.classList.toggle("connected", enabled);
-  statusPill.classList.toggle("paused", !enabled);
-}
-
-function updatePrimaryCta(enabled) {
-  const actionLabel = enabled ? "Pause 15m" : "Resume";
-  if (homePrimary) {
-    homePrimary.textContent = actionLabel;
-    homePrimary.dataset.intent = enabled ? "pause" : "resume";
-  }
-  if (menuPause) {
-    menuPause.textContent = actionLabel;
-    const intent = enabled ? "pause" : "resume";
-    menuPause.dataset.intent = intent;
-    menuPause.dataset.action = intent === "pause" ? "pause" : "resume";
-  }
-}
-
-function setToggleUI(enabled) {
-  currentEnabled = Boolean(enabled);
-  if (toggleBtn) {
-    toggleBtn.dataset.state = currentEnabled ? "on" : "off";
-    toggleBtn.classList.toggle("on", currentEnabled);
-    toggleBtn.classList.toggle("off", !currentEnabled);
-    toggleBtn.setAttribute("aria-checked", currentEnabled ? "true" : "false");
-  }
-  if (dialLabel) {
-    dialLabel.textContent = currentEnabled ? "ON" : "OFF";
-  }
-  updateStatusPill(currentEnabled);
-  updatePrimaryCta(currentEnabled);
-}
-
-function setModeUI(mode) {
-  const fallback = MODE_LABELS[mode] ? mode : "Default";
-  currentMode = fallback;
-  if (modeSel) modeSel.value = fallback;
-  if (footerProfile) footerProfile.textContent = labelForMode(fallback);
-}
-
-function updateBlockingSummary(blocking) {
-  if (!blockedTodayEl || !blockedTotalEl || !blocklistSummary) return;
-  const stats = blocking?.stats || {};
-  const todayCount = Number(stats.daily?.count || 0);
-  const totalCount = Number(stats.totalBlocked || 0);
-  blockedTodayEl.textContent = Number.isFinite(todayCount) ? todayCount.toLocaleString() : "0";
-  blockedTotalEl.textContent = Number.isFinite(totalCount) ? totalCount.toLocaleString() : "0";
-
-  if (!blocking) {
-    blocklistSummary.textContent = "Unavailable";
-    return;
-  }
-  const active = Array.isArray(blocking.activeRulesetIds) ? blocking.activeRulesetIds.length : 0;
-  const total = typeof blocking.totalRulesets === "number" ? blocking.totalRulesets : active;
-  const custom = Array.isArray(blocking.customBlocklist) ? blocking.customBlocklist.length : 0;
-  const customLabel = `${custom} custom`;
-  blocklistSummary.textContent = `${active}/${total} active • ${customLabel}`;
-}
-
-function showView(id) {
-  views.forEach((view) => {
-    const isActive = view.id === id;
-    view.classList.toggle("is-active", isActive);
-  });
-  tabButtons.forEach((tab) => {
-    const isActive = tab.dataset.target === id;
-    tab.classList.toggle("is-active", isActive);
-    tab.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-}
-
-tabButtons.forEach((tab) => {
-  tab.addEventListener("click", (event) => {
-    event.preventDefault();
-    showView(tab.dataset.target);
-  });
+document.addEventListener("DOMContentLoaded", async () => {
+  setupEventListeners();
+  await hydrateFromCache();
+  renderHomeView();
+  loadQuickState().catch(() => {});
+  await loadData();
+  render();
 });
 
-function createDeviceRow(device) {
-  const row = document.createElement("article");
-  row.className = "device-row";
-
-  const meta = document.createElement("div");
-  meta.className = "device-row__meta";
-  const nameEl = document.createElement("span");
-  nameEl.className = "device-row__name";
-  nameEl.textContent = device.name;
-  const typeEl = document.createElement("span");
-  typeEl.className = "device-row__type";
-  typeEl.textContent = device.type;
-  meta.append(nameEl, typeEl);
-
-  const controls = document.createElement("div");
-  controls.className = "device-row__controls";
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "switch";
-  toggle.dataset.state = device.enabled ? "on" : "off";
-  toggle.setAttribute("role", "switch");
-  toggle.setAttribute("aria-checked", device.enabled ? "true" : "false");
-  toggle.title = `Toggle protection for ${device.name}`;
-  toggle.setAttribute("aria-label", `Turn protection ${device.enabled ? "off" : "on"} for ${device.name}`);
-
-  const track = document.createElement("span");
-  track.className = "switch__track";
-  const thumb = document.createElement("span");
-  thumb.className = "switch__thumb";
-  track.appendChild(thumb);
-
-  const switchText = document.createElement("span");
-  switchText.className = "switch__text";
-  switchText.textContent = device.enabled ? "On" : "Off";
-
-  toggle.append(track, switchText);
-
-  const selectWrap = document.createElement("label");
-  selectWrap.className = "device-row__select field select--small";
-  const selectLabel = document.createElement("span");
-  selectLabel.className = "label";
-  selectLabel.textContent = "Profile";
-
-  const selectBox = document.createElement("div");
-  selectBox.className = "select select--small";
-  const select = document.createElement("select");
-  select.setAttribute("aria-label", `Select profile for ${device.name}`);
-
-  DEVICE_MODE_OPTIONS.forEach((opt) => {
-    const option = document.createElement("option");
-    option.value = opt.value;
-    option.textContent = opt.label;
-    select.appendChild(option);
+function setupEventListeners() {
+  const menuButton = document.getElementById("menuButton");
+  const menuList = document.getElementById("menuList");
+  
+  menuButton?.addEventListener("click", () => {
+    if (!menuList) return;
+    const isOpen = menuList.dataset.open === "true";
+    const next = isOpen ? "false" : "true";
+    menuList.dataset.open = next;
+    menuButton.setAttribute("aria-expanded", next);
   });
-  select.value = DEVICE_MODE_OPTIONS.some((opt) => opt.value === device.mode) ? device.mode : "Default";
-
-  selectBox.appendChild(select);
-  selectWrap.append(selectLabel, selectBox);
-
-  controls.append(toggle, selectWrap);
-  row.append(meta, controls);
-
-  toggle.addEventListener("click", async () => {
-    const previous = device.enabled;
-    try {
-      await withLatency(toggle, async () => {
-        device.enabled = !device.enabled;
-        toggle.dataset.state = device.enabled ? "on" : "off";
-        toggle.setAttribute("aria-checked", device.enabled ? "true" : "false");
-        switchText.textContent = device.enabled ? "On" : "Off";
-        toggle.setAttribute("aria-label", `Turn protection ${device.enabled ? "off" : "on"} for ${device.name}`);
-        await persistDevices();
-      });
-      toast(`${device.name}: ${device.enabled ? "Protection on" : "Protection off"}`);
-    } catch (error) {
-      console.error("Unable to update device", error);
-      device.enabled = previous;
-      renderDevices();
-      toast("Could not update device. Try again.");
+  
+  document.addEventListener("click", (e) => {
+    if (menuButton && menuList && !menuButton.contains(e.target) && !menuList.contains(e.target)) {
+      menuList.dataset.open = "false";
+      menuButton.setAttribute("aria-expanded", "false");
     }
   });
-
-  select.addEventListener("change", async (event) => {
-    const target = event.currentTarget;
-    const wrapper = target.closest(".select");
-    const previous = device.mode;
-    try {
-      await withLatency(wrapper, async () => {
-        device.mode = target.value;
-        await persistDevices();
+  
+  menuList?.querySelectorAll(".menu__item").forEach(item => {
+    item.addEventListener("click", (e) => {
+      const action = e.target.dataset.action;
+      const origin = preferredOrigin || API_ORIGINS[0];
+      
+      if (action === "dashboard") {
+        chrome.tabs.create({ url: origin });
+      } else if (action === "options") {
+        chrome.runtime.openOptionsPage();
+      }
+      
+      menuList.dataset.open = "false";
+      menuButton?.setAttribute("aria-expanded", "false");
+    });
+  });
+  
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const viewName = tab.dataset.view;
+      
+      document.querySelectorAll(".tab").forEach(t => {
+        t.classList.remove("is-active");
+        t.setAttribute("aria-selected", "false");
       });
-      toast(`${device.name}: profile set to ${labelForMode(device.mode)}`);
-    } catch (error) {
-      console.error("Unable to update device mode", error);
-      device.mode = previous;
-      target.value = previous;
-      toast("Could not save profile. Try again.");
+      tab.classList.add("is-active");
+      tab.setAttribute("aria-selected", "true");
+      
+      document.querySelectorAll(".view").forEach(v => {
+        v.classList.remove("is-active");
+        v.setAttribute("aria-hidden", "true");
+      });
+
+      const activeView = document.getElementById(`view-${viewName}`);
+      activeView?.classList.add("is-active");
+      activeView?.setAttribute("aria-hidden", "false");
+    });
+  });
+  
+  const shieldBtn = document.getElementById("shieldBtn");
+  shieldBtn?.addEventListener("click", () => {
+    isProtectionOn = !isProtectionOn;
+    const protectionToggle = document.getElementById("protectionToggle");
+    if (protectionToggle) {
+      protectionToggle.checked = isProtectionOn;
+    }
+    render();
+    showToast(isProtectionOn ? "Protection enabled" : "Protection disabled");
+  });
+  
+  const protectionToggle = document.getElementById("protectionToggle");
+  protectionToggle?.addEventListener("change", (e) => {
+    isProtectionOn = e.target.checked;
+    render();
+    showToast(isProtectionOn ? "Protection enabled" : "Protection disabled");
+  });
+  
+  const pauseBtn = document.getElementById("pauseBtn");
+  const pauseMenu = document.getElementById("pauseMenu");
+  
+  pauseBtn?.addEventListener("click", () => {
+    pauseMenu?.classList.toggle("is-open");
+  });
+  
+  pauseMenu?.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const minutes = parseInt(e.target.dataset.minutes);
+      await handlePause(minutes);
+      pauseMenu.classList.remove("is-open");
+    });
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (pauseBtn && !pauseBtn.contains(e.target) && !pauseMenu?.contains(e.target)) {
+      pauseMenu?.classList.remove("is-open");
     }
   });
-
-  return row;
-}
-
-function renderDevices() {
-  if (!deviceList) return;
-  deviceList.innerHTML = "";
-  const top = devices.slice(0, 4);
-  if (!top.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "No devices to show yet.";
-    deviceList.appendChild(empty);
-    return;
-  }
-  top.forEach((device) => {
-    const row = createDeviceRow(device);
-    deviceList.appendChild(row);
+  
+  const profileSelect = document.getElementById("profileSelect");
+  profileSelect?.addEventListener("change", (e) => {
+    activeProfileId = e.target.value;
+    const profileName = e.target.options[e.target.selectedIndex].text;
+    showToast(`Applied ${profileName}`);
+  });
+  
+  const openDashboard = document.getElementById("openDashboard");
+  openDashboard?.addEventListener("click", () => {
+    const origin = preferredOrigin || API_ORIGINS[0];
+    chrome.tabs.create({ url: `${origin}/#devices` });
   });
 }
 
-function storageGet(key) {
-  if (!API.storage?.local) return Promise.resolve({});
-  const getter = API.storage.local.get.bind(API.storage.local);
-  if (getter.length <= 1) {
-    return getter(key);
-  }
-  return new Promise((resolve) => {
-    getter(key, (value) => resolve(value || {}));
-  });
-}
-
-function storageSet(value) {
-  if (!API.storage?.local) return Promise.resolve();
-  const setter = API.storage.local.set.bind(API.storage.local);
-  if (setter.length <= 1) {
-    return setter(value);
-  }
-  return new Promise((resolve) => {
-    setter(value, () => resolve());
-  });
-}
-
-async function persistDevices() {
+async function loadData() {
   try {
-    await storageSet({ uiDevices: devices });
+    const state = await fetchJSON("/api/state");
+    devices = state.devices || [];
+    profiles = state.profiles || [
+      { id: "default", name: "Default" },
+      { id: "school", name: "School" },
+      { id: "focus", name: "Focus" }
+    ];
+    activeProfileId = state.activeProfile || activeProfileId;
+    globalPauseUntil = state.pausedUntil || null;
+    if (typeof state.enabledGlobal === "boolean") {
+      isProtectionOn = state.enabledGlobal;
+    }
+    const activeListsFromState = extractActiveLists(state);
+    if (activeListsFromState !== null) {
+      metrics.activeLists = activeListsFromState;
+    }
+    if (!quickStateReady && Array.isArray(state.logs)) {
+      const fallbackMetrics = deriveMetricsFromLogs(state.logs);
+      metrics.blockedToday = fallbackMetrics.blockedToday;
+      metrics.blockedTotal = fallbackMetrics.blockedTotal;
+    }
+    
+    const profileSelect = document.getElementById("profileSelect");
+    if (profileSelect) {
+      profileSelect.innerHTML = profiles.map(p => 
+        `<option value="${p.id}">${p.name}</option>`
+      ).join("");
+      if (activeProfileId) {
+        profileSelect.value = activeProfileId;
+      }
+    }
+    
+    const statusPill = document.getElementById("statusPill");
+    if (statusPill) {
+      statusPill.textContent = "Connected";
+      statusPill.className = "pill connected";
+    }
   } catch (error) {
-    console.warn("Unable to persist devices", error);
+    console.error("Load error:", error);
+    const statusPill = document.getElementById("statusPill");
+    if (statusPill) {
+      statusPill.textContent = "Offline";
+      statusPill.className = "pill paused";
+    }
   }
 }
 
-async function loadDevices() {
-  try {
-    const stored = await storageGet("uiDevices");
-    if (stored && Array.isArray(stored.uiDevices)) {
-      devices = stored.uiDevices.map((dev) => ({
-        ...dev,
-        mode: dev.mode || "Default",
-        enabled: typeof dev.enabled === "boolean" ? dev.enabled : true,
-      }));
+function render() {
+  renderHomeView();
+  renderDevicesView();
+  savePopupCache();
+}
+
+function renderHomeView() {
+  const shieldBtn = document.getElementById("shieldBtn");
+  const shieldLabel = document.getElementById("shieldLabel");
+  const protectionToggle = document.getElementById("protectionToggle");
+  const statusText = document.getElementById("statusText");
+  const isPaused = isGlobalPauseActive();
+  
+  if (shieldBtn && shieldLabel) {
+    shieldBtn.classList.toggle("is-paused", isPaused);
+    if (isPaused) {
+      shieldBtn.classList.remove("is-off");
+      shieldLabel.textContent = "PAUSED";
+    } else if (isProtectionOn) {
+      shieldBtn.classList.remove("is-off");
+      shieldLabel.textContent = "ON";
     } else {
-      devices = [...DEFAULT_DEVICES];
+      shieldBtn.classList.add("is-off");
+      shieldLabel.textContent = "OFF";
     }
-  } catch (error) {
-    console.warn("Unable to load stored devices", error);
-    devices = [...DEFAULT_DEVICES];
+
+    shieldBtn.setAttribute("aria-pressed", String(isProtectionOn && !isPaused));
   }
-  renderDevices();
+  
+  if (protectionToggle) {
+    protectionToggle.checked = isProtectionOn;
+  }
+  
+  if (statusText) {
+    if (isPaused) {
+      statusText.textContent = "Paused";
+    } else {
+      statusText.textContent = isProtectionOn ? "Protected" : "Disabled";
+    }
+  }
+
+  const footerDot = document.querySelector(".status-dot");
+  const footerText = document.querySelector(".footer__status span:last-child");
+  if (footerDot && footerText) {
+    footerDot.classList.remove("paused", "off");
+
+    if (isPaused) {
+      footerDot.classList.add("paused");
+      footerText.textContent = "Protection is paused";
+    } else if (!isProtectionOn) {
+      footerDot.classList.add("off");
+      footerText.textContent = "Protection is disabled";
+    } else {
+      footerText.textContent = "Protection is active";
+    }
+  }
+  
+  const blockedToday = document.getElementById("blockedToday");
+  const blockedTotal = document.getElementById("blockedTotal");
+  const activeLists = document.getElementById("activeLists");
+  
+  if (blockedToday) blockedToday.textContent = formatNumber(metrics.blockedToday);
+  if (blockedTotal) blockedTotal.textContent = formatNumber(metrics.blockedTotal);
+  if (activeLists) {
+    if (Array.isArray(metrics.activeLists) && metrics.activeLists.length) {
+      activeLists.textContent = metrics.activeLists.join(", ");
+    } else if (Array.isArray(metrics.activeLists)) {
+      activeLists.textContent = "No lists enabled";
+    } else {
+      activeLists.textContent = "--";
+    }
+  }
+
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) {
+    if (isPaused) {
+      pauseBtn.classList.add("is-paused");
+      pauseBtn.textContent = getPauseCountdownLabel(globalPauseUntil);
+    } else {
+      pauseBtn.classList.remove("is-paused");
+      pauseBtn.innerHTML = "Pause &#9662;";
+    }
+  }
+
+  const profileSelect = document.getElementById("profileSelect");
+  if (profileSelect && activeProfileId) {
+    profileSelect.value = activeProfileId;
+  }
 }
 
-async function handleSiteToggle(triggerElement) {
-  const previous = currentEnabled;
-  try {
-    await withLatency(triggerElement || toggleBtn, async () => {
-      const response = await runtimeSendMessage({ type: "TOGGLE_SITE" });
-      if (!response || typeof response.enabled === "undefined") {
-        throw new Error("No response");
+function renderDevicesView() {
+  const deviceList = document.getElementById("deviceList");
+  if (!deviceList) return;
+  
+  if (devices.length === 0) {
+    deviceList.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">No devices found</p>';
+    return;
+  }
+  
+  deviceList.innerHTML = devices.map(device => createDeviceCard(device)).join("");
+  
+  deviceList.querySelectorAll(".device-card").forEach((card, index) => {
+    const device = devices[index];
+    
+    const shieldToggle = card.querySelector(".device-shield-toggle");
+    shieldToggle?.addEventListener("change", async (e) => {
+      try {
+        await updateDevice(device.id, { enabled: e.target.checked });
+        showToast(`${device.name} ${e.target.checked ? "enabled" : "disabled"}`);
+      } catch (error) {
+        showToast("Failed to update device", "error");
+        e.target.checked = !e.target.checked;
       }
-      setToggleUI(response.enabled);
-      toast(response.enabled ? "Protection resumed" : "Protection paused for this site");
-      await refresh();
     });
-  } catch (error) {
-    console.error("Unable to toggle site", error);
-    setToggleUI(previous);
-    toast("Unable to update protection. Please try again.");
-  }
-}
-
-function closeMenu() {
-  if (!menu) return;
-  menu.dataset.open = "false";
-  if (menuButton) menuButton.setAttribute("aria-expanded", "false");
-}
-
-if (menuButton) {
-  menuButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (!menu) return;
-    const isOpen = menu?.dataset.open === "true";
-    menu.dataset.open = isOpen ? "false" : "true";
-    menuButton.setAttribute("aria-expanded", isOpen ? "false" : "true");
-  });
-}
-
-if (menuList) {
-  menuList.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    const action = target.dataset.action;
-    if (!action) return;
-    closeMenu();
-    if (action === "dashboard") {
-      runtimeSendMessage({ type: "OPEN_DASHBOARD" }).catch((error) => console.error(error));
-    } else if (action === "options") {
-      API.runtime.openOptionsPage();
-    } else if (action === "pause" || action === "resume") {
-      handleSiteToggle(menuPause).catch(() => {});
-    }
-  });
-}
-
-document.addEventListener("click", (event) => {
-  if (!menu) return;
-  if (!menu.contains(event.target)) closeMenu();
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeMenu();
-});
-
-if (toggleBtn) {
-  toggleBtn.addEventListener("click", () => handleSiteToggle(toggleBtn));
-}
-
-if (homePrimary) {
-  homePrimary.addEventListener("click", () => handleSiteToggle(homePrimary));
-}
-
-if (homeSecondary) {
-  homeSecondary.addEventListener("click", () => {
-    runtimeSendMessage({ type: "OPEN_DASHBOARD" }).catch((error) => console.error(error));
-  });
-}
-
-if (manageDevices) {
-  manageDevices.addEventListener("click", () => {
-    API.runtime.openOptionsPage();
-  });
-}
-
-if (modeSel) {
-  modeSel.addEventListener("change", async () => {
-    const selectionWrapper = modeSel.closest(".select");
-    const previous = currentMode;
-    const next = modeSel.value;
-    try {
-      await withLatency(selectionWrapper, async () => {
-        await runtimeSendMessage({ type: "SET_MODE", mode: next });
-        setModeUI(next);
+    
+    const profileSelect = card.querySelector(".device-profile-select");
+    profileSelect?.addEventListener("change", async (e) => {
+      try {
+        await updateDevice(device.id, { profileId: e.target.value });
+        const profileName = e.target.options[e.target.selectedIndex].text;
+        showToast(`Applied ${profileName} to ${device.name}`);
+      } catch (error) {
+        showToast("Failed to update profile", "error");
+      }
+    });
+    
+    const pauseBtn = card.querySelector(".device-pause-btn");
+    const pauseMenu = card.querySelector(".device-pause-menu");
+    
+    if (pauseBtn && pauseMenu) {
+      pauseBtn.addEventListener("click", () => {
+        pauseMenu.classList.toggle("is-open");
       });
-      toast(`Profile set to ${labelForMode(next)}`);
-      await refresh();
-    } catch (error) {
-      console.error("Unable to update profile", error);
-      setModeUI(previous);
-      if (modeSel) modeSel.value = previous;
-      toast("Could not update profile. Try again.");
+      
+      pauseMenu.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          const minutes = parseInt(e.target.dataset.minutes);
+          await handleDevicePause(device.id, device.name, minutes);
+          pauseMenu.classList.remove("is-open");
+        });
+      });
     }
   });
 }
 
-async function refresh() {
+function createDeviceCard(device) {
+  const isPaused = device.pausedUntil && new Date(device.pausedUntil) > new Date();
+  const status = isPaused ? "paused" : (device.enabled ? "active" : "off");
+  const statusText = isPaused ? "PAUSED" : (device.enabled ? "ACTIVE" : "OFF");
+  
+  let pauseBtnText = "Pause &#9662;";
+  let pauseBtnClass = "device-pause-btn";
+  
+  if (isPaused) {
+    const remaining = Math.ceil((new Date(device.pausedUntil) - new Date()) / 60000);
+    pauseBtnText = formatTime(remaining);
+    pauseBtnClass += " is-paused";
+  }
+  
+  return `
+    <div class="device-card">
+      <div class="device-card__header">
+        <div class="device-card__name">${device.name}</div>
+        <div class="device-card__status ${status}">${statusText}</div>
+      </div>
+      <div class="device-card__controls">
+        <div class="device-control-row">
+          <div class="device-control-row__label">Shield:</div>
+          <div class="device-control-row__input">
+            <label class="sw">
+              <input type="checkbox" class="device-shield-toggle" role="switch" ${device.enabled ? "checked" : ""} />
+              <span class="sw__track"><span class="sw__thumb"></span></span>
+            </label>
+          </div>
+        </div>
+        <div class="device-control-row">
+          <div class="device-control-row__label">Profile:</div>
+          <div class="device-control-row__input">
+            <select class="select device-profile-select">
+              ${profiles.map(p => `<option value="${p.id}" ${p.id === device.profileId ? "selected" : ""}>${p.name}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="device-control-row">
+          <div class="device-control-row__label">Pause:</div>
+          <div class="device-control-row__input">
+            <div class="device-pause-wrapper">
+              <button class="${pauseBtnClass}">${pauseBtnText}</button>
+              <div class="device-pause-menu">
+                <button data-minutes="15">15 min</button>
+                <button data-minutes="30">30 min</button>
+                <button data-minutes="60">1 hour</button>
+                <button data-minutes="240">4 hours</button>
+                <button data-minutes="1440">24 hours</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function updateDevice(deviceId, payload) {
+  const origin = preferredOrigin || API_ORIGINS[0];
+  const res = await fetch(`${origin}/api/devices/${deviceId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+}
+
+async function handlePause(minutes) {
   try {
-    const response = await runtimeSendMessage({ type: "GET_QUICK_STATE" });
-    if (!response) return;
-    currentOrigin = response.origin || null;
-    setToggleUI(response.enabled !== false);
-    setModeUI(response.mode || "Default");
-    if (deviceName) {
-      const valueEl = deviceName.querySelector(".device-chip__value");
-      if (valueEl) valueEl.textContent = response.device || "This device";
+    const pauseUntil = new Date(Date.now() + minutes * 60000).toISOString();
+    for (const device of devices) {
+      await updateDevice(device.id, { pausedUntil: pauseUntil });
     }
-    if (footerSite) footerSite.textContent = hostFromOrigin(response.origin) || "—";
-    updateBlockingSummary(response.blocking);
+    
+    globalPauseUntil = pauseUntil;
+    renderHomeView();
+    savePopupCache();
+    
+    showToast(`Paused for ${formatTime(minutes)}`);
   } catch (error) {
-    console.error("Unable to refresh popup state", error);
+    showToast("Failed to pause", "error");
   }
 }
 
-showView("view-home");
-loadDevices().catch((error) => console.error(error));
-refresh().catch((error) => console.error(error));
+async function handleDevicePause(deviceId, deviceName, minutes) {
+  try {
+    const until = new Date(Date.now() + minutes * 60000).toISOString();
+    await updateDevice(deviceId, { pausedUntil: until });
+    
+    const device = devices.find(d => d.id === deviceId);
+    if (device) {
+      device.pausedUntil = until;
+    }
+    
+    renderDevicesView();
+    showToast(`${deviceName} paused for ${formatTime(minutes)}`);
+  } catch (error) {
+    showToast("Failed to pause device", "error");
+  }
+}
+
+function formatTime(minutes) {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+function showToast(message, type = "success") {
+  const toastRoot = document.getElementById("toastRoot");
+  if (!toastRoot) return;
+  
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${type}`;
+  toast.textContent = message;
+  
+  toastRoot.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 200);
+  }, 3000);
+}
+
+async function loadQuickState() {
+  if (!chrome?.runtime?.sendMessage) return null;
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(null);
+      }
+    }, 600);
+
+    chrome.runtime.sendMessage({ type: "GET_QUICK_STATE" }, (response) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+
+      if (response) {
+        applyQuickState(response);
+      }
+
+      resolve(response || null);
+    });
+  });
+}
+
+function applyQuickState(snapshot) {
+  quickStateReady = true;
+
+  const stats = snapshot?.blocking?.stats;
+  if (stats) {
+    if (typeof stats.totalBlocked !== "undefined") {
+      const total = Number(stats.totalBlocked);
+      if (Number.isFinite(total)) {
+        metrics.blockedTotal = total;
+      }
+    }
+    if (typeof stats.daily?.count !== "undefined") {
+      const daily = Number(stats.daily.count);
+      if (Number.isFinite(daily)) {
+        metrics.blockedToday = daily;
+      }
+    }
+  }
+
+  const rulesets = snapshot?.blocking?.rulesets;
+  if (Array.isArray(rulesets)) {
+    metrics.activeLists = rulesets.filter(r => r.enabled).map(r => r.label);
+  }
+
+  if (Array.isArray(snapshot?.blocking?.activeRulesetIds)) {
+    isProtectionOn = snapshot.blocking.activeRulesetIds.length > 0;
+  }
+
+  renderHomeView();
+  savePopupCache();
+}
+
+async function fetchWithTimeout(url, options = {}, timeout = 1500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchJSON(path) {
+  const attemptOrigin = async (origin) => {
+    const res = await fetchWithTimeout(`${origin}${path}`, {}, 1500);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    preferredOrigin = origin;
+    return data;
+  };
+
+  const origins = preferredOrigin
+    ? [preferredOrigin, ...API_ORIGINS.filter((origin) => origin !== preferredOrigin)]
+    : [...API_ORIGINS];
+
+  let lastError;
+  for (const origin of origins) {
+    try {
+      return await attemptOrigin(origin);
+    } catch (error) {
+      lastError = error;
+      preferredOrigin = null;
+    }
+  }
+
+  throw lastError || new Error("All API origins failed");
+}
+
+async function hydrateFromCache() {
+  if (!chrome?.storage?.local?.get) return null;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(POPUP_CACHE_KEY, (result) => {
+      if (chrome.runtime?.lastError) {
+        resolve(null);
+        return;
+      }
+
+      const cache = result?.[POPUP_CACHE_KEY];
+      if (cache && typeof cache === "object") {
+        if (typeof cache.isProtectionOn === "boolean") {
+          isProtectionOn = cache.isProtectionOn;
+        }
+
+        if (typeof cache.globalPauseUntil === "string") {
+          globalPauseUntil = cache.globalPauseUntil;
+        }
+
+        if (typeof cache.activeProfileId === "string") {
+          activeProfileId = cache.activeProfileId;
+        }
+
+        if (cache.metrics && typeof cache.metrics === "object") {
+          if (typeof cache.metrics.blockedToday === "number") {
+            metrics.blockedToday = cache.metrics.blockedToday;
+          }
+          if (typeof cache.metrics.blockedTotal === "number") {
+            metrics.blockedTotal = cache.metrics.blockedTotal;
+          }
+          if (Array.isArray(cache.metrics.activeLists)) {
+            metrics.activeLists = cache.metrics.activeLists.slice();
+          }
+        }
+      }
+
+      resolve(cache || null);
+    });
+  });
+}
+
+function savePopupCache() {
+  if (!chrome?.storage?.local?.set) return;
+  const payload = {
+    isProtectionOn,
+    globalPauseUntil,
+    activeProfileId,
+    metrics: {
+      blockedToday: typeof metrics.blockedToday === "number" ? metrics.blockedToday : null,
+      blockedTotal: typeof metrics.blockedTotal === "number" ? metrics.blockedTotal : null,
+      activeLists: Array.isArray(metrics.activeLists) ? metrics.activeLists.slice() : []
+    }
+  };
+
+  chrome.storage.local.set({ [POPUP_CACHE_KEY]: payload }, () => {});
+}
+
+function extractActiveLists(state) {
+  const blocklists = state?.filters?.blocklists;
+  if (!Array.isArray(blocklists)) return null;
+  return blocklists
+    .filter((item) => item.enabled !== false)
+    .map((item) => item.name)
+    .filter(Boolean);
+}
+
+function deriveMetricsFromLogs(logs) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  let blockedTotal = 0;
+  let blockedToday = 0;
+
+  for (const entry of logs) {
+    if (entry?.action !== "blocked") continue;
+    blockedTotal += 1;
+    const entryDate = normalizeLogDate(entry.time);
+    if (entryDate === todayKey) {
+      blockedToday += 1;
+    }
+  }
+
+  return { blockedToday, blockedTotal };
+}
+
+function normalizeLogDate(raw) {
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function formatNumber(value) {
+  if (value === null || typeof value === "undefined") {
+    return "--";
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "--";
+  return number.toLocaleString();
+}
+
+function isGlobalPauseActive() {
+  if (!globalPauseUntil) return false;
+  const until = new Date(globalPauseUntil).getTime();
+  if (!Number.isFinite(until)) {
+    globalPauseUntil = null;
+    return false;
+  }
+  if (until <= Date.now()) {
+    globalPauseUntil = null;
+    return false;
+  }
+  return true;
+}
+
+function getPauseCountdownLabel(untilIso) {
+  if (!untilIso) return "Pause";
+  const until = new Date(untilIso).getTime();
+  if (!Number.isFinite(until)) return "Pause";
+  const diffMs = until - Date.now();
+  if (diffMs <= 0) {
+    globalPauseUntil = null;
+    return "Pause";
+  }
+  const minutes = Math.ceil(diffMs / 60000);
+  return `Resume in ${formatTime(minutes)}`;
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -7,129 +7,120 @@
   <link rel="stylesheet" href="popup.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
-  <meta
-    http-equiv="Content-Security-Policy"
-    content="default-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com;"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:*; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:;" />
 </head>
 <body>
   <div id="popup">
     <header class="header">
       <div class="brand">
-        <img src="bushido_shield_logo.svg" alt="Bushido Shield logo" class="brand__logo" width="40" height="40" />
+        <img src="bushido_shield_logo.svg" alt="Bushido Shield" class="brand__logo" />
         <div class="brand__copy">
-          <span class="brand__name">Bushido Shield</span>
-          <span class="brand__tagline">Friendly protection</span>
+          <div class="brand__name">Bushido Shield</div>
+          <div class="brand__tagline">Friendly protection</div>
         </div>
       </div>
       <div class="header__actions">
-        <span id="statusPill" class="pill pill--ok">Connected</span>
+        <div class="pill connected" id="statusPill">Connected</div>
         <div class="menu">
-          <button id="menuButton" class="menu__toggle" aria-haspopup="true" aria-expanded="false">
-            <span class="menu__text">Menu</span>
-            <span aria-hidden="true">⋮</span>
-          </button>
-          <div id="menuList" class="menu__list" role="menu">
-            <button type="button" class="menu__item" role="menuitem" data-action="dashboard">Open dashboard</button>
-            <button type="button" class="menu__item" role="menuitem" data-action="options">Options</button>
-            <button type="button" class="menu__item" role="menuitem" data-action="pause" id="menuPause">Pause 15m</button>
+          <button id="menuButton" class="menu__toggle" aria-label="Menu" aria-haspopup="true" aria-expanded="false">Menu</button>
+          <div class="menu__list" id="menuList" data-open="false">
+            <button class="menu__item" data-action="dashboard">Open dashboard</button>
+            <button class="menu__item" data-action="options">Settings</button>
           </div>
         </div>
       </div>
     </header>
 
-    <nav class="tabs" role="tablist" aria-label="Popup views">
-      <button id="tab-home" class="tab is-active" role="tab" aria-selected="true" data-target="view-home">Home</button>
-      <button id="tab-devices" class="tab" role="tab" aria-selected="false" data-target="view-devices">Devices</button>
+    <nav class="tabs" aria-label="Views" role="tablist">
+      <button class="tab is-active" data-view="home" aria-selected="true" role="tab">Home</button>
+      <button class="tab" data-view="devices" aria-selected="false" role="tab">Devices</button>
     </nav>
 
     <main class="content">
-      <section id="view-home" class="view is-active" role="tabpanel" aria-labelledby="tab-home">
+      <section id="view-home" class="view is-active" role="tabpanel" aria-hidden="false">
         <div class="panel panel--home">
-          <div class="dial">
-            <button
-              id="toggleBtn"
-              class="dial__button"
-              role="switch"
-              aria-checked="false"
-              title="Turn protection on/off for this site"
-            >
-              <span class="dial__glow" aria-hidden="true"></span>
-              <span class="dial__label" id="dialLabel">OFF</span>
+          <section class="hero" aria-label="Protection">
+            <button id="shieldBtn" class="shield-btn" aria-pressed="true">
+              <svg class="shield-btn__icon" viewBox="0 0 64 64" aria-hidden="true">
+                <path d="M32 6L52 14V28C52 41 43 52 32 56C21 52 12 41 12 28V14L32 6Z" fill="currentColor" />
+              </svg>
+              <span id="shieldLabel" class="shield-btn__label">ON</span>
             </button>
-            <p class="helper">Blocks ads &amp; trackers on this site.</p>
-          </div>
-
-          <div class="home-meta">
-            <div class="mode">
-              <label class="field">
-                <span class="label">Profile</span>
-                <div class="select">
-                  <select id="mode" aria-label="Select profile">
-                    <option value="Default">Normal</option>
-                    <option value="School">School</option>
-                    <option value="Focus">Focus</option>
-                    <option value="Sleep">Sleep</option>
-                    <option value="Custom">Custom</option>
-                    <option value="Travel">Travel</option>
-                    <option value="Gaming">Gaming</option>
-                    <option value="Reading">Reading</option>
-                  </select>
+            <div class="hero__controls">
+              <div class="control-item">
+                <div class="control-item__label">Protection</div>
+                <label class="sw">
+                  <input type="checkbox" id="protectionToggle" role="switch" checked />
+                  <span class="sw__track"><span class="sw__thumb"></span></span>
+                  <span class="sw__text">Network wide</span>
+                </label>
+              </div>
+              <div class="control-item">
+                <div class="control-item__label">Pause</div>
+                <div class="pause-wrapper">
+                  <button id="pauseBtn" class="btn btn--secondary btn-pause">Pause &#9662;</button>
+                  <div id="pauseMenu" class="pause-menu">
+                    <button data-minutes="15">15 min</button>
+                    <button data-minutes="30">30 min</button>
+                    <button data-minutes="60">1 hour</button>
+                    <button data-minutes="240">4 hours</button>
+                    <button data-minutes="1440">24 hours</button>
+                  </div>
                 </div>
-              </label>
-              <div class="device-chip" id="deviceName" title="Current device">
-                <span class="label">Device</span>
-                <span class="device-chip__value">This device</span>
+              </div>
+              <div class="control-item">
+                <div class="control-item__label">Profile</div>
+                <select id="profileSelect" class="select">
+                  <option value="default">Default</option>
+                  <option value="school">School</option>
+                  <option value="focus">Focus</option>
+                </select>
               </div>
             </div>
+          </section>
 
-            <div class="stats-row" id="statsRow" role="group" aria-label="Shield stats">
-              <div class="stat">
-                <span class="stat__label">Today</span>
-                <span class="stat__value" id="blockedToday">0</span>
-              </div>
-              <div class="stat">
-                <span class="stat__label">All time</span>
-                <span class="stat__value" id="blockedTotal">0</span>
-              </div>
-              <div class="stat stat--wide">
-                <span class="stat__label">Blocklists</span>
-                <span class="stat__value" id="blocklistSummary">Checking…</span>
-              </div>
+          <div class="info-box">
+            <span class="info-label">Status</span>
+            <span class="info-value" id="statusText">Protected</span>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-tile">
+              <div class="stat-tile__value" id="blockedToday">--</div>
+              <div class="stat-tile__label">Blocked today</div>
+            </div>
+            <div class="stat-tile">
+              <div class="stat-tile__value" id="blockedTotal">--</div>
+              <div class="stat-tile__label">Total blocked</div>
             </div>
           </div>
 
-          <div class="actions">
-            <button id="homePrimary" class="btn btn--primary" type="button">Pause 15m</button>
-            <button id="homeSecondary" class="btn btn--ghost" type="button">Open dashboard</button>
+          <div class="info-box">
+            <span class="info-label">Active lists</span>
+            <span class="info-value" id="activeLists">--</span>
           </div>
         </div>
       </section>
 
-      <section id="view-devices" class="view" role="tabpanel" aria-labelledby="tab-devices">
+      <section id="view-devices" class="view" role="tabpanel" aria-hidden="true">
         <div class="panel panel--devices">
-          <header class="panel__header">
-            <h2 class="h2">Devices</h2>
-            <p class="muted">Top devices currently protected.</p>
-          </header>
-          <div id="deviceList" class="device-list" aria-live="polite"></div>
-          <button id="manageDevices" class="btn btn--ghost" type="button">Manage devices…</button>
+          <div id="deviceList" class="device-list"></div>
+          <button id="openDashboard" class="btn-link">Open full dashboard -></button>
         </div>
       </section>
     </main>
 
-    <footer class="footer" aria-live="polite">
-      <span class="footer__item">Site: <span id="footerSite" class="footer__value">—</span></span>
-      <span class="footer__dot" aria-hidden="true">•</span>
-      <span class="footer__item">Profile: <span id="footerProfile" class="footer__value">Normal</span></span>
+    <footer class="footer">
+      <div class="footer__status">
+        <span class="status-dot"></span>
+        <span>Protection is active</span>
+      </div>
     </footer>
+
+    <div id="toastRoot" class="toast-root"></div>
   </div>
 
-  <div id="toastRoot" class="toast-stack" aria-live="polite"></div>
-  <script src="popup.js" type="module"></script>
+  <script src="popup.js"></script>
 </body>
 </html>

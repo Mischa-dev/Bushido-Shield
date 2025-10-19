@@ -1,0 +1,290 @@
+{
+  "devices": [
+    {
+      "id": "dev-bushido-01",
+      "name": "Bushido-01 (Pi 5 Pro)",
+      "type": "Gateway — Pi 5 Pro",
+      "ip": "192.168.1.10",
+      "mac": "AA:BB:CC:DD:EE:10",
+      "enabled": true,
+      "profileId": "prof-default",
+      "lastSeen": "2025-10-19T03:19:18.824Z",
+      "pausedUntil": null
+    },
+    {
+      "id": "dev-bushido-02",
+      "name": "Bushido-02 (Pi 3B+)",
+      "type": "Gateway — Pi 3B+",
+      "ip": "192.168.1.11",
+      "mac": "AA:BB:CC:DD:EE:11",
+      "enabled": true,
+      "profileId": "prof-default",
+      "lastSeen": "2025-10-19T03:19:18.824Z"
+    },
+    {
+      "id": "dev-bushido-leaf",
+      "name": "Bushido-Leaf (Pi Zero W2)",
+      "type": "Sensor — Pi Zero W2",
+      "ip": "192.168.1.12",
+      "mac": "AA:BB:CC:DD:EE:12",
+      "enabled": true,
+      "profileId": "prof-default",
+      "lastSeen": "2025-10-19T03:19:18.824Z",
+      "pausedUntil": null
+    },
+    {
+      "id": "dev-mischa",
+      "name": "MischxLaptop",
+      "type": "Laptop — Windows",
+      "ip": "192.168.1.42",
+      "mac": "AA:BB:CC:DD:EE:42",
+      "enabled": true,
+      "profileId": "prof-school",
+      "lastSeen": "2025-10-19T03:19:18.824Z"
+    },
+    {
+      "id": "dev-pixel",
+      "name": "Pixel 6 Pro",
+      "type": "Phone — Android",
+      "ip": "192.168.1.77",
+      "mac": "AA:BB:CC:DD:EE:77",
+      "enabled": true,
+      "profileId": "prof-focus",
+      "lastSeen": "2025-10-19T03:19:18.824Z",
+      "pausedUntil": null
+    }
+  ],
+  "profiles": [
+    {
+      "id": "prof-default",
+      "name": "Default",
+      "description": "Balanced protection for everyday browsing.",
+      "blockPorn": true,
+      "blockGambling": true,
+      "blockTrackers": true,
+      "blockSocial": false,
+      "socialSites": [
+        "facebook.com",
+        "instagram.com"
+      ],
+      "customBlockList": [],
+      "customAllowList": [],
+      "timeRules": [],
+      "system": false,
+      "customEnabled": false,
+      "blockList": [],
+      "allowList": []
+    },
+    {
+      "id": "prof-school",
+      "name": "School",
+      "description": "Locks down distractions during study hours.",
+      "blockPorn": true,
+      "blockGambling": true,
+      "blockTrackers": true,
+      "blockSocial": true,
+      "socialSites": [
+        "youtube.com",
+        "tiktok.com",
+        "instagram.com"
+      ],
+      "customBlockList": [],
+      "customAllowList": [],
+      "timeRules": [
+        {
+          "type": "allow_internet",
+          "description": "Homework window",
+          "days": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu"
+          ],
+          "start": "15:30",
+          "end": "19:30",
+          "enabled": true
+        }
+      ],
+      "system": true
+    },
+    {
+      "id": "prof-focus",
+      "name": "Focus",
+      "description": "Tight restrictions for deep work sessions.",
+      "blockPorn": true,
+      "blockGambling": true,
+      "blockTrackers": true,
+      "blockSocial": true,
+      "socialSites": [
+        "reddit.com",
+        "twitter.com",
+        "news.ycombinator.com"
+      ],
+      "customBlockList": [
+        "twitch.tv"
+      ],
+      "customAllowList": [
+        "docs.google.com"
+      ],
+      "timeRules": [
+        {
+          "type": "block_internet",
+          "description": "Wind down",
+          "days": [
+            "Sun",
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu"
+          ],
+          "start": "22:00",
+          "end": "06:00",
+          "enabled": true
+        }
+      ],
+      "system": true
+    },
+    {
+      "id": "prof-nzzfzw",
+      "name": "Test",
+      "description": "",
+      "blockPorn": false,
+      "blockGambling": false,
+      "blockTrackers": false,
+      "blockSocial": true,
+      "socialSites": [
+        "twitter.com"
+      ],
+      "customEnabled": false,
+      "blockList": [],
+      "allowList": [],
+      "timeRules": [],
+      "system": false
+    }
+  ],
+  "schedules": [
+    {
+      "id": "sch-1",
+      "target": {
+        "type": "device",
+        "id": "dev-pixel"
+      },
+      "rules": [
+        {
+          "days": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu"
+          ],
+          "start": "21:00",
+          "end": "07:00"
+        }
+      ]
+    }
+  ],
+  "filters": {
+    "blocklists": [
+      {
+        "id": "bl-1",
+        "name": "OISD Basic",
+        "source": "https://oisd.nl/basic.txt",
+        "enabled": true,
+        "lastSync": "2025-10-19T03:19:18.824Z"
+      },
+      {
+        "id": "bl-2",
+        "name": "HaGeZi Multi",
+        "source": "https://example/hagezi.txt",
+        "enabled": true,
+        "lastSync": "2025-10-19T03:19:18.824Z"
+      }
+    ],
+    "allowlist": [
+      "school.edu",
+      "docs.google.com"
+    ],
+    "customRules": [
+      "||doubleclick.net^",
+      "@@||youtube.com^$document"
+    ],
+    "blocked": [
+      "doubleclick.net",
+      "docs.google.com",
+      "youtube.com"
+    ],
+    "allowed": [
+      "docs.google.com",
+      "doubleclick.net",
+      "youtube.com"
+    ]
+  },
+  "logs": [
+    {
+      "id": "log-xcpb73",
+      "time": 1760853122552,
+      "domain": "youtube.com",
+      "action": "allowed",
+      "device": "Manual",
+      "rule": "User added"
+    },
+    {
+      "id": "log-cap06g",
+      "time": 1760853121448,
+      "domain": "youtube.com",
+      "action": "blocked",
+      "device": "Manual",
+      "rule": "User added"
+    },
+    {
+      "id": "log-sanv3x",
+      "time": 1760853120539,
+      "domain": "docs.google.com",
+      "action": "blocked",
+      "device": "Manual",
+      "rule": "User added"
+    },
+    {
+      "id": "log-6gfjh7",
+      "time": 1760853116971,
+      "domain": "doubleclick.net",
+      "action": "allowed",
+      "device": "Manual",
+      "rule": "User added"
+    },
+    {
+      "id": "log-r2h6jp",
+      "time": "2025-10-19T03:19:18.824Z",
+      "domain": "doubleclick.net",
+      "action": "blocked",
+      "device": "MischxLaptop",
+      "rule": "OISD Basic"
+    },
+    {
+      "id": "log-1u6i4b",
+      "time": "2025-10-19T03:19:18.824Z",
+      "domain": "docs.google.com",
+      "action": "allowed",
+      "device": "MischxLaptop",
+      "rule": "Allowlist"
+    },
+    {
+      "id": "log-nog3xb",
+      "time": "2025-10-19T03:19:18.824Z",
+      "domain": "youtube.com",
+      "action": "policy",
+      "device": "Pixel 6 Pro",
+      "rule": "Focus profile"
+    }
+  ],
+  "settings": {
+    "dns": "quad9",
+    "dnsCustom": "",
+    "admin": "Mischa",
+    "familyLock": true
+  },
+  "enabledGlobal": true,
+  "activeProfile": "prof-default",
+  "lastSync": "2025-10-19T03:19:18.824Z",
+  "pausedUntil": null
+}
