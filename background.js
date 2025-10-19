@@ -7,7 +7,7 @@ const DASHBOARD_API = 'http://localhost:5179/api';
 
 const DEFAULT_STATE = {
   sites: {},
-  device: { name: "This device", mode: "Default" },
+  device: { name: "This device", mode: "Default", boundDeviceId: null },
   blocking: {
     rulesets: {
       ads: true,
@@ -110,6 +110,7 @@ function normalizeState(raw) {
     device: {
       name: state.device?.name || DEFAULT_STATE.device.name,
       mode: state.device?.mode || DEFAULT_STATE.device.mode,
+      boundDeviceId: state.device?.boundDeviceId || null,
     },
     blocking: {
       rulesets: {
@@ -197,14 +198,46 @@ async function setDeviceMode(mode) {
   const st = await getStateWithDefaults();
   st.device.mode = mode;
   await setState(st);
+  // Sync mode to server:
+  // If we're bound to a device, update that device's profileId.
+  // Otherwise, fall back to updating the global activeProfile.
   try {
-    await fetch(`${DASHBOARD_API}/state`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activeProfile: mode })
-    });
+    const boundDeviceId = st.device.boundDeviceId;
+    if (boundDeviceId) {
+      await fetch(`${DASHBOARD_API}/devices/${boundDeviceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: mode })
+      });
+    } else {
+      await fetch(`${DASHBOARD_API}/state`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activeProfile: mode })
+      });
+    }
   } catch (error) {
     console.warn('Dashboard sync failed', error);
+  }
+}
+
+// Periodically sync local mode from server when bound device's profile changes on the dashboard
+async function syncModeFromServer() {
+  try {
+    const st = await getStateWithDefaults();
+    const boundDeviceId = st.device.boundDeviceId;
+    if (!boundDeviceId) return;
+    const res = await fetch(`${DASHBOARD_API}/devices`);
+    if (!res.ok) return;
+    const devices = await res.json();
+    const dev = Array.isArray(devices) ? devices.find(d => d.id === boundDeviceId) : null;
+    const serverProfileId = dev?.profileId;
+    if (serverProfileId && serverProfileId !== st.device.mode) {
+      st.device.mode = serverProfileId;
+      await setState(st);
+    }
+  } catch (e) {
+    // best effort
   }
 }
 
@@ -381,8 +414,39 @@ bootstrapBlocking().catch(() => {});
 if (API.runtime?.onInstalled) {
   API.runtime.onInstalled.addListener(() => {
     bootstrapBlocking().catch(() => {});
+    try { API.alarms?.create('bushido-sync', { periodInMinutes: 0.2 }); } catch (_) {}
   });
 }
+
+// Pull binding from server (when dashboard binds/unbinds) and keep mode in sync
+async function syncBindingFromServer() {
+  try {
+    const res = await fetch(`${DASHBOARD_API}/extension-binding`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const serverBoundId = data?.boundDeviceId || null;
+    const st = await getStateWithDefaults();
+    if (st.device.boundDeviceId !== serverBoundId) {
+      st.device.boundDeviceId = serverBoundId;
+      await setState(st);
+    }
+  } catch (e) {
+    // best effort
+  }
+}
+
+async function backgroundSync() {
+  await syncBindingFromServer();
+  await syncModeFromServer();
+}
+
+// Also schedule with alarms so MV3 service worker wakes periodically
+try {
+  API.alarms?.create('bushido-sync', { periodInMinutes: 0.2 }); // ~12s
+  API.alarms?.onAlarm.addListener((alarm) => {
+    if (alarm?.name === 'bushido-sync') backgroundSync();
+  });
+} catch (_) {}
 
 if (HAS_DNR && DNR.onRuleMatchedDebug) {
   DNR.onRuleMatchedDebug.addListener(async () => {
@@ -399,6 +463,47 @@ if (HAS_DNR && DNR.onRuleMatchedDebug) {
   });
 }
 
+async function setBoundDevice(deviceId) {
+  const st = await getStateWithDefaults();
+  st.device.boundDeviceId = deviceId;
+  const saved = await setState(st);
+  // Sync binding to server
+  try {
+    await fetch(`${DASHBOARD_API}/extension-binding`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: deviceId || null })
+    });
+  } catch (error) {
+    console.warn('Failed to sync binding to server:', error);
+  }
+  // Pull latest mode from server for this device
+  await syncModeFromServer();
+  return saved;
+}
+
+async function getBoundDevice() {
+  const st = await getStateWithDefaults();
+  return st.device.boundDeviceId;
+}
+
+async function unbindDevice() {
+  const st = await getStateWithDefaults();
+  st.device.boundDeviceId = null;
+  const saved = await setState(st);
+  // Sync unbinding to server
+  try {
+    await fetch(`${DASHBOARD_API}/extension-binding`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.warn('Failed to sync unbinding to server:', error);
+  }
+  // No longer bound; nothing to sync from server
+  return saved;
+}
+
 // Handle popup requests
 API.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
@@ -412,6 +517,7 @@ API.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         enabled,
         mode: st.device.mode,
         device: st.device.name,
+        boundDeviceId: st.device.boundDeviceId,
         blocking: buildBlockingSnapshot(st),
       });
     } else if (msg.type === "TOGGLE_SITE") {
@@ -464,6 +570,15 @@ API.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } else if (msg.type === "RESET_BLOCKING_STATS") {
       const saved = await resetBlockingStats();
       sendResponse({ ok: true, blocking: buildBlockingSnapshot(saved) });
+    } else if (msg.type === "BIND_DEVICE") {
+      const saved = await setBoundDevice(msg.deviceId);
+      sendResponse({ ok: true, boundDeviceId: saved.device.boundDeviceId });
+    } else if (msg.type === "UNBIND_DEVICE") {
+      const saved = await unbindDevice();
+      sendResponse({ ok: true, boundDeviceId: null });
+    } else if (msg.type === "GET_BOUND_DEVICE") {
+      const boundDeviceId = await getBoundDevice();
+      sendResponse({ ok: true, boundDeviceId });
     }
   })();
   // Return true to signal async response

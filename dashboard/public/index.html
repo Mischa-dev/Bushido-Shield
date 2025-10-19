@@ -804,6 +804,33 @@
       </div>
       
       <div style="display:flex;flex-direction:column;gap:var(--space-5);">
+        <!-- Device Binding -->
+        <div class="panel" style="padding:var(--space-5);">
+          <div class="panel__header" style="margin-bottom:0;">
+            <span class="label">Extension</span>
+            <h3 class="h2" style="font-size:18px;">Device Binding</h3>
+            <p class="muted" style="margin-top:var(--space-2);">Bind this extension to a specific device so dashboard changes apply to it.</p>
+          </div>
+          <div style="margin-top:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3);">
+            <!-- Current binding status -->
+            <div style="padding:var(--space-3);border-radius:var(--r-ctl);border:1px solid var(--border);background:rgba(15,23,42,.02);">
+              <p class="label" style="margin:0;">Current Binding:</p>
+              <p id="currentBindingStatus" class="text" style="margin:var(--space-1) 0 0 0;font-weight:500;">Loading...</p>
+            </div>
+            <!-- Device selector -->
+            <div style="display:flex;gap:var(--space-2);align-items:flex-end;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <label class="label" for="deviceBindingSelect">Select Device:</label>
+                <select id="deviceBindingSelect" style="width:100%;padding:var(--space-2);border:1px solid var(--border);border-radius:var(--r-ctl);font:500 14px var(--font);margin-top:var(--space-1);">
+                  <option value="">Choose a device...</option>
+                </select>
+              </div>
+              <button id="bindDeviceBtn" class="btn btn--primary" style="white-space:nowrap;">Bind Device</button>
+              <button id="unbindDeviceBtn" class="btn" style="white-space:nowrap;display:none;">Unbind</button>
+            </div>
+          </div>
+        </div>
+        
         <!-- Family Mode / Parental Lock -->
         <div class="panel" style="padding:var(--space-5);">
           <div class="panel__header" style="margin-bottom:0;">

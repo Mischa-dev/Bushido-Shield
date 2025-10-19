@@ -425,6 +425,28 @@ const DataAPI = {
     }
   },
 
+  // === DEVICE BINDING OPERATIONS ===
+  // Note: Always use HTTP to communicate with server
+  // Server manages the binding state for the extension
+  async getExtensionBinding() {
+    // Always query the server for current binding
+    const res = await this._httpRequest('/extension-binding');
+    return res?.boundDeviceId || null;
+  },
+
+  async bindExtensionToDevice(deviceId) {
+    const res = await this._httpRequest('/extension-binding', {
+      method: 'PATCH',
+      body: JSON.stringify({ deviceId })
+    });
+    return res?.boundDeviceId ?? null;
+  },
+
+  async unbindExtension() {
+    const res = await this._httpRequest('/extension-binding', { method: 'DELETE' });
+    return res?.boundDeviceId === null;
+  },
+
   async updateStatePartial(storageUpdates) {
     if (this.USE_LOCAL_STORAGE) {
       await set(storageUpdates);
@@ -539,9 +561,13 @@ async function seedIfNeeded() {
 async function loadState() { await seedIfNeeded(); return await get(['bs:devices','bs:profiles','bs:filters','bs:enabled:global','bs:activeProfile','bs:lastSync','bs:schedules','bs:settings','bs:logs','bs:pausedUntil']); }
 // @@CHUNK4
 // Advanced modal handlers
-advancedBtn?.addEventListener('click', () => {
+let originalAdvancedBtnHandler = null;
+advancedBtn?.addEventListener('click', async () => {
   advancedModal?.classList.add('is-open');
-  setTimeout(() => closeAdvanced?.focus(), 100);
+  setTimeout(async () => {
+    await updateDeviceBindingUI().catch(e => console.warn('Failed to update device binding UI:', e));
+    closeAdvanced?.focus();
+  }, 100);
 });
 closeAdvanced?.addEventListener('click', () => advancedModal?.classList.remove('is-open'));
 closeAdvancedFooter?.addEventListener('click', () => advancedModal?.classList.remove('is-open'));
@@ -581,6 +607,94 @@ familyLock?.addEventListener('change', async ()=>{
   const active = document.querySelector('.seg .tab.active');
   if (active?.classList.contains('adv') && familyLock.checked) showPage('tab-main');
   toast(familyLock.checked ? 'Family Mode enabled' : 'Family Mode disabled');
+});
+
+// Device Binding Controls
+const currentBindingStatus = document.getElementById('currentBindingStatus');
+const deviceBindingSelect = document.getElementById('deviceBindingSelect');
+const bindDeviceBtn = document.getElementById('bindDeviceBtn');
+const unbindDeviceBtn = document.getElementById('unbindDeviceBtn');
+
+async function updateDeviceBindingUI() {
+  const st = await loadState();
+  const devices = st['bs:devices'] || [];
+  
+  // Get current binding from extension
+  let currentBinding = null;
+  try {
+    currentBinding = await DataAPI.getExtensionBinding();
+  } catch (e) {
+    console.warn('Could not fetch extension binding:', e);
+  }
+  
+  // Update status display
+  if (currentBinding) {
+    const boundDevice = devices.find(d => d.id === currentBinding);
+    currentBindingStatus.textContent = boundDevice ? `✓ Bound to: ${boundDevice.name}` : `✓ Bound to: ${currentBinding}`;
+    currentBindingStatus.style.color = 'var(--success)';
+    bindDeviceBtn.style.display = 'none';
+    unbindDeviceBtn.style.display = 'inline-block';
+  } else {
+    currentBindingStatus.innerHTML = `<span style="color:var(--danger);">⚠ Not bound to any device</span><p class="muted" style="margin:var(--space-2) 0 0 0;font-size:13px;">Select a device below to bind this extension.</p>`;
+    bindDeviceBtn.style.display = 'inline-block';
+    unbindDeviceBtn.style.display = 'none';
+  }
+  
+  // Populate device selector
+  deviceBindingSelect.innerHTML = '<option value="">Choose a device...</option>';
+  devices.forEach(device => {
+    const option = document.createElement('option');
+    option.value = device.id;
+    option.textContent = device.name;
+    if (currentBinding === device.id) option.selected = true;
+    deviceBindingSelect.appendChild(option);
+  });
+}
+
+bindDeviceBtn?.addEventListener('click', async () => {
+  const selectedDeviceId = deviceBindingSelect.value;
+  if (!selectedDeviceId) {
+    toast('Please select a device first');
+    return;
+  }
+  
+  const st = await loadState();
+  const device = (st['bs:devices'] || []).find(d => d.id === selectedDeviceId);
+  if (!device) {
+    toast('Device not found');
+    return;
+  }
+  
+  try {
+    console.log('Binding to device:', selectedDeviceId);
+    const result = await DataAPI.bindExtensionToDevice(selectedDeviceId);
+    console.log('Bind result:', result);
+    if (result !== null && result !== undefined) {
+      toast(`✓ Extension bound to ${device.name}`);
+      await updateDeviceBindingUI();
+    } else {
+      toast('Failed to bind device');
+      console.warn('Bind returned null/undefined');
+    }
+  } catch (e) {
+    console.error('Binding error:', e);
+    toast('Error binding device');
+  }
+});
+
+unbindDeviceBtn?.addEventListener('click', async () => {
+  try {
+    const result = await DataAPI.unbindExtension();
+    if (result) {
+      toast('✓ Extension unbound');
+      await updateDeviceBindingUI();
+    } else {
+      toast('Failed to unbind extension');
+    }
+  } catch (e) {
+    console.error('Unbinding error:', e);
+    toast('Error unbinding extension');
+  }
 });
 
 function renderSpark(){ if (!spark) return; spark.innerHTML=''; const vals=[5,12,7,16,9,13,8,17,6,14,9,10,12,8,7,13,15,9,12,8,6,10,11,7,9,12]; vals.forEach(v=>{ const b=document.createElement('span'); b.style.height=`${8+v*2}px`; spark.appendChild(b); }); }

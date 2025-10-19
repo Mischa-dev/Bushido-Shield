@@ -422,6 +422,50 @@ const DataAPI = {
         body: JSON.stringify(updates)
       });
     }
+  },
+
+  // === DEVICE BINDING OPERATIONS ===
+  // Note: Always use HTTP to communicate with server
+  // Server manages the binding state for the extension
+  
+  async getExtensionBinding() {
+    try {
+      const response = await fetch('/api/extension-binding');
+      if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+      const data = await response.json();
+      return data.boundDeviceId;
+    } catch (e) {
+      console.warn('Could not get bound device:', e);
+      return null;
+    }
+  },
+
+  async bindExtensionToDevice(deviceId) {
+    try {
+      const response = await fetch('/api/extension-binding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId })
+      });
+      if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+      const data = await response.json();
+      return data.boundDeviceId;
+    } catch (e) {
+      console.warn('Could not bind device:', e);
+      return null;
+    }
+  },
+
+  async unbindExtension() {
+    try {
+      const response = await fetch('/api/extension-binding', { method: 'DELETE' });
+      if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+      const data = await response.json();
+      return data.boundDeviceId === null;
+    } catch (e) {
+      console.warn('Could not unbind device:', e);
+      return false;
+    }
   }
 };
 

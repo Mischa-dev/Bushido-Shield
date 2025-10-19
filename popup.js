@@ -13,6 +13,7 @@ let metrics = {
   activeLists: null
 };
 let quickStateReady = false;
+let boundDeviceId = null; // when bound, homescreen controls target this device
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
@@ -81,19 +82,37 @@ function setupEventListeners() {
   });
   
   const shieldBtn = document.getElementById("shieldBtn");
-  shieldBtn?.addEventListener("click", () => {
-    isProtectionOn = !isProtectionOn;
-    const protectionToggle = document.getElementById("protectionToggle");
-    if (protectionToggle) {
-      protectionToggle.checked = isProtectionOn;
+  shieldBtn?.addEventListener("click", async () => {
+    try {
+      if (boundDeviceId) {
+        const updated = await updateDevice(boundDeviceId, { enabled: !isProtectionOn });
+        isProtectionOn = !!updated?.enabled;
+      } else {
+        // fallback: local toggle + toast
+        isProtectionOn = !isProtectionOn;
+      }
+    } catch (_) {
+      // ignore, keep current state
     }
+    const protectionToggle = document.getElementById("protectionToggle");
+    if (protectionToggle) protectionToggle.checked = isProtectionOn;
     render();
     showToast(isProtectionOn ? "Protection enabled" : "Protection disabled");
   });
   
   const protectionToggle = document.getElementById("protectionToggle");
-  protectionToggle?.addEventListener("change", (e) => {
-    isProtectionOn = e.target.checked;
+  protectionToggle?.addEventListener("change", async (e) => {
+    const next = !!e.target.checked;
+    try {
+      if (boundDeviceId) {
+        const updated = await updateDevice(boundDeviceId, { enabled: next });
+        isProtectionOn = !!updated?.enabled;
+      } else {
+        isProtectionOn = next;
+      }
+    } catch (_) {
+      e.target.checked = isProtectionOn; // revert on failure
+    }
     render();
     showToast(isProtectionOn ? "Protection enabled" : "Protection disabled");
   });
@@ -108,7 +127,11 @@ function setupEventListeners() {
   pauseMenu?.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const minutes = parseInt(e.target.dataset.minutes);
-      await handlePause(minutes);
+      if (boundDeviceId) {
+        await handleDevicePause(boundDeviceId, "This device", minutes);
+      } else {
+        await handlePause(minutes);
+      }
       pauseMenu.classList.remove("is-open");
     });
   });
@@ -120,10 +143,30 @@ function setupEventListeners() {
   });
   
   const profileSelect = document.getElementById("profileSelect");
-  profileSelect?.addEventListener("change", (e) => {
-    activeProfileId = e.target.value;
+  profileSelect?.addEventListener("change", async (e) => {
+    const newProfileId = e.target.value;
     const profileName = e.target.options[e.target.selectedIndex].text;
-    showToast(`Applied ${profileName}`);
+    try {
+      if (boundDeviceId) {
+        const updated = await updateDevice(boundDeviceId, { profileId: newProfileId });
+        activeProfileId = updated?.profileId || newProfileId;
+      } else {
+        // fallback: update global active profile via background
+        await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: "SET_MODE", mode: newProfileId }, (resp) => {
+            if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+            if (resp?.ok) return resolve(true);
+            reject(new Error('SET_MODE failed'));
+          });
+        });
+        activeProfileId = newProfileId;
+      }
+      showToast(`Applied ${profileName}`);
+    } catch (_) {
+      // revert UI
+      if (activeProfileId) e.target.value = activeProfileId;
+      showToast('Failed to apply profile', 'error');
+    }
   });
   
   const openDashboard = document.getElementById("openDashboard");
@@ -142,10 +185,24 @@ async function loadData() {
       { id: "school", name: "School" },
       { id: "focus", name: "Focus" }
     ];
-    activeProfileId = state.activeProfile || activeProfileId;
-    globalPauseUntil = state.pausedUntil || null;
-    if (typeof state.enabledGlobal === "boolean") {
-      isProtectionOn = state.enabledGlobal;
+    if (typeof state.extensionBinding !== "undefined") {
+      boundDeviceId = state.extensionBinding || null;
+    }
+
+    const boundDevice = boundDeviceId ? devices.find((d) => d.id === boundDeviceId) : null;
+
+    if (boundDevice) {
+      activeProfileId = boundDevice.profileId || activeProfileId;
+      globalPauseUntil = boundDevice.pausedUntil || null;
+      if (typeof boundDevice.enabled === "boolean") {
+        isProtectionOn = boundDevice.enabled;
+      }
+    } else {
+      activeProfileId = state.activeProfile || activeProfileId;
+      globalPauseUntil = state.pausedUntil || null;
+      if (typeof state.enabledGlobal === "boolean") {
+        isProtectionOn = state.enabledGlobal;
+      }
     }
     const activeListsFromState = extractActiveLists(state);
     if (activeListsFromState !== null) {
@@ -394,7 +451,23 @@ async function updateDevice(deviceId, payload) {
   });
   
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
+  const updated = await res.json();
+  const idx = devices.findIndex((d) => d.id === updated.id);
+  if (idx !== -1) {
+    devices[idx] = { ...devices[idx], ...updated };
+  } else {
+    devices.push(updated);
+  }
+  if (boundDeviceId === updated.id) {
+    if (typeof updated.enabled === "boolean") {
+      isProtectionOn = updated.enabled;
+    }
+    if (typeof updated.profileId !== "undefined") {
+      activeProfileId = updated.profileId || activeProfileId;
+    }
+    globalPauseUntil = updated.pausedUntil || null;
+  }
+  return updated;
 }
 
 async function handlePause(minutes) {
@@ -417,13 +490,11 @@ async function handlePause(minutes) {
 async function handleDevicePause(deviceId, deviceName, minutes) {
   try {
     const until = new Date(Date.now() + minutes * 60000).toISOString();
-    await updateDevice(deviceId, { pausedUntil: until });
-    
-    const device = devices.find(d => d.id === deviceId);
-    if (device) {
-      device.pausedUntil = until;
+    const updated = await updateDevice(deviceId, { pausedUntil: until });
+    if (boundDeviceId === deviceId) {
+      globalPauseUntil = updated?.pausedUntil || until;
+      renderHomeView();
     }
-    
     renderDevicesView();
     showToast(`${deviceName} paused for ${formatTime(minutes)}`);
   } catch (error) {
@@ -487,6 +558,10 @@ async function loadQuickState() {
 function applyQuickState(snapshot) {
   quickStateReady = true;
 
+  if (typeof snapshot?.boundDeviceId !== 'undefined') {
+    boundDeviceId = snapshot.boundDeviceId;
+  }
+
   const stats = snapshot?.blocking?.stats;
   if (stats) {
     if (typeof stats.totalBlocked !== "undefined") {
@@ -510,6 +585,16 @@ function applyQuickState(snapshot) {
 
   if (Array.isArray(snapshot?.blocking?.activeRulesetIds)) {
     isProtectionOn = snapshot.blocking.activeRulesetIds.length > 0;
+  }
+
+  // If we know the bound device and we have full devices loaded, hydrate home view from that device
+  if (boundDeviceId && Array.isArray(devices)) {
+    const d = devices.find(x => x.id === boundDeviceId);
+    if (d) {
+      isProtectionOn = !!d.enabled;
+      activeProfileId = d.profileId || activeProfileId;
+      globalPauseUntil = d.pausedUntil || globalPauseUntil;
+    }
   }
 
   renderHomeView();

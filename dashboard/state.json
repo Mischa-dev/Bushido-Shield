@@ -19,7 +19,8 @@
       "mac": "AA:BB:CC:DD:EE:11",
       "enabled": true,
       "profileId": "prof-default",
-      "lastSeen": "2025-10-19T03:19:18.824Z"
+      "lastSeen": "2025-10-19T03:19:18.824Z",
+      "pausedUntil": null
     },
     {
       "id": "dev-bushido-leaf",
@@ -38,9 +39,10 @@
       "type": "Laptop — Windows",
       "ip": "192.168.1.42",
       "mac": "AA:BB:CC:DD:EE:42",
-      "enabled": true,
-      "profileId": "prof-school",
-      "lastSeen": "2025-10-19T03:19:18.824Z"
+      "enabled": false,
+      "profileId": "prof-default",
+      "lastSeen": "2025-10-19T03:19:18.824Z",
+      "pausedUntil": null
     },
     {
       "id": "dev-pixel",
@@ -49,7 +51,7 @@
       "ip": "192.168.1.77",
       "mac": "AA:BB:CC:DD:EE:77",
       "enabled": true,
-      "profileId": "prof-focus",
+      "profileId": "prof-nzzfzw",
       "lastSeen": "2025-10-19T03:19:18.824Z",
       "pausedUntil": null
     }
@@ -283,8 +285,9 @@
     "admin": "Mischa",
     "familyLock": true
   },
+  "extensionBinding": "dev-mischa",
   "enabledGlobal": true,
-  "activeProfile": "prof-default",
+  "activeProfile": "prof-school",
   "lastSync": "2025-10-19T03:19:18.824Z",
   "pausedUntil": null
 }

@@ -194,6 +194,7 @@ function createDefaultState() {
       admin: 'Mischa',
       familyLock: true
     },
+    extensionBinding: null,
     enabledGlobal: true,
     activeProfile: 'prof-default',
     lastSync: now,
@@ -639,6 +640,43 @@ app.post('/api/logs', async (req, res, next) => {
       return { ...current, logs };
     });
     res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Extension binding endpoints
+app.get('/api/extension-binding', async (req, res, next) => {
+  try {
+    const state = await loadState();
+    res.json({ boundDeviceId: state.extensionBinding });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/extension-binding', async (req, res, next) => {
+  try {
+    const { deviceId } = req.body || {};
+    const state = await mutateState((current) => {
+      // Verify device exists if binding to one
+      if (deviceId && !current.devices.some(d => d.id === deviceId)) {
+        return current;
+      }
+      return { ...current, extensionBinding: deviceId || null };
+    });
+    res.json({ boundDeviceId: state.extensionBinding });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/extension-binding', async (req, res, next) => {
+  try {
+    const state = await mutateState((current) => {
+      return { ...current, extensionBinding: null };
+    });
+    res.json({ boundDeviceId: null });
   } catch (error) {
     next(error);
   }
