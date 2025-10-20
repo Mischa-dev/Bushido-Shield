@@ -14,8 +14,28 @@ let metrics = {
 };
 let quickStateReady = false;
 let boundDeviceId = null; // when bound, homescreen controls target this device
+let adminPin = "7777";
+let devicesUnlocked = false;
+let pinAttemptCount = 0;
+let pinLockedUntil = 0;
+let pinGateResolver = null;
+let pinGateContext = null;
+
+const PIN_FAIL_LIMIT = 5;
+const PIN_LOCK_DURATION = 30000;
+const PIN_UNLOCK_KEY = "bs:adminUnlockTs";
+const PIN_UNLOCK_TTL = 60000;
+
+const pinGateView = document.getElementById("view-pin-gate");
+const pinGateForm = document.getElementById("pinGateForm");
+const pinGateInput = document.getElementById("pinGateInput");
+const pinGateError = document.getElementById("pinGateError");
+const pinGateCancel = document.getElementById("pinGateCancel");
+const pinGateTitle = document.getElementById("pinGateTitle");
+const pinGateHint = document.getElementById("pinGateHint");
 
 document.addEventListener("DOMContentLoaded", async () => {
+  devicesUnlocked = isPinUnlocked();
   setupEventListeners();
   await hydrateFromCache();
   renderHomeView();
@@ -60,24 +80,16 @@ function setupEventListeners() {
   });
   
   document.querySelectorAll(".tab").forEach(tab => {
-    tab.addEventListener("click", () => {
+    tab.addEventListener("click", async (event) => {
+      event.preventDefault();
       const viewName = tab.dataset.view;
-      
-      document.querySelectorAll(".tab").forEach(t => {
-        t.classList.remove("is-active");
-        t.setAttribute("aria-selected", "false");
-      });
-      tab.classList.add("is-active");
-      tab.setAttribute("aria-selected", "true");
-      
-      document.querySelectorAll(".view").forEach(v => {
-        v.classList.remove("is-active");
-        v.setAttribute("aria-hidden", "true");
-      });
 
-      const activeView = document.getElementById(`view-${viewName}`);
-      activeView?.classList.add("is-active");
-      activeView?.setAttribute("aria-hidden", "false");
+      if (viewName === "devices") {
+        const ok = await ensureDevicesAccess({ prompt: true, tabElement: tab, targetView: "devices" });
+        if (!ok) return;
+      }
+
+      activateTab(tab, viewName);
     });
   });
   
@@ -176,9 +188,236 @@ function setupEventListeners() {
   });
 }
 
+function activateTab(tabElement, viewName, overrideView) {
+  const target = viewName || tabElement?.dataset?.view || "home";
+
+  if (target === "devices" && !overrideView && !isPinUnlocked()) {
+    const tabRef = tabElement || document.querySelector('.tab[data-view="devices"]');
+    showPinGate({
+      targetView: "devices",
+      tabElement: tabRef,
+      previousView: getActiveViewName()
+    });
+    return;
+  }
+
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.classList.remove("is-active");
+    t.setAttribute("aria-selected", "false");
+  });
+
+  const activeTab = tabElement || document.querySelector(`.tab[data-view="${target}"]`);
+  activeTab?.classList.add("is-active");
+  activeTab?.setAttribute("aria-selected", "true");
+
+  document.querySelectorAll(".view").forEach((v) => {
+    v.classList.remove("is-active");
+    v.setAttribute("aria-hidden", "true");
+  });
+
+  const shownViewId = overrideView ? `view-${overrideView}` : `view-${target}`;
+  const activeView = document.getElementById(shownViewId);
+  activeView?.classList.add("is-active");
+  activeView?.setAttribute("aria-hidden", "false");
+
+  if (target === "devices" && !overrideView) {
+    renderDevicesView();
+  }
+}
+
+function getActiveViewName() {
+  return document.querySelector(".tab.is-active")?.dataset.view || "home";
+}
+
+function readUnlockTimestamp() {
+  if (!window?.localStorage) return 0;
+  const raw = window.localStorage.getItem(PIN_UNLOCK_KEY);
+  return raw ? Number(raw) || 0 : 0;
+}
+
+function writeUnlockTimestamp(ts) {
+  if (!window?.localStorage) return;
+  window.localStorage.setItem(PIN_UNLOCK_KEY, String(ts));
+}
+
+function clearUnlockTimestamp() {
+  if (!window?.localStorage) return;
+  window.localStorage.removeItem(PIN_UNLOCK_KEY);
+}
+
+function isPinUnlocked() {
+  const ts = readUnlockTimestamp();
+  if (!ts) return false;
+  return Date.now() - ts <= PIN_UNLOCK_TTL;
+}
+
+function lockoutRemaining(now = Date.now()) {
+  if (!pinLockedUntil) return 0;
+  return Math.max(0, pinLockedUntil - now);
+}
+
+function ensurePinGatePromise() {
+  if (pinGateResolver) {
+    return new Promise((resolve) => {
+      const previousResolver = pinGateResolver;
+      pinGateResolver = (result) => {
+        try { previousResolver(result); } catch (_){}
+        resolve(result);
+      };
+    });
+  }
+  return new Promise((resolve) => {
+    pinGateResolver = resolve;
+  });
+}
+
+function showPinGate(context) {
+  const copyMap = {
+    devices: {
+      title: "Unlock Devices",
+      hint: "Enter the admin PIN to view and manage devices."
+    }
+  };
+  const requestedTarget = context?.targetView || "devices";
+  const copy = context?.copy || copyMap[requestedTarget] || {
+    title: "Admin PIN Required",
+    hint: "Enter the admin PIN to continue."
+  };
+  if (pinGateContext && pinGateResolver && pinGateContext.targetView === requestedTarget) {
+    if (pinGateTitle) pinGateTitle.textContent = copy.title;
+    if (pinGateHint) pinGateHint.textContent = copy.hint;
+    if (pinGateError) pinGateError.textContent = "";
+    if (pinGateInput) {
+      pinGateInput.value = "";
+      requestAnimationFrame(() => pinGateInput.focus());
+    }
+    return ensurePinGatePromise();
+  }
+  pinGateContext = {
+    targetView: requestedTarget,
+    tabElement: context?.tabElement || null,
+    previousView: (() => {
+      const prev = context?.previousView || getActiveViewName();
+      const target = context?.targetView || "devices";
+      return prev === target ? "home" : prev;
+    })()
+  };
+  if (pinGateTitle) pinGateTitle.textContent = copy.title;
+  if (pinGateHint) pinGateHint.textContent = copy.hint;
+  if (pinGateError) pinGateError.textContent = "";
+  if (pinGateInput) {
+    pinGateInput.value = "";
+    requestAnimationFrame(() => pinGateInput.focus());
+  }
+  activateTab(pinGateContext.tabElement, pinGateContext.targetView, "pin-gate");
+  return ensurePinGatePromise();
+}
+
+function resolvePinGate(result) {
+  if (typeof pinGateResolver === "function") {
+    const resolver = pinGateResolver;
+    pinGateResolver = null;
+    resolver(result);
+  }
+  pinGateContext = null;
+}
+
+function normalizePinEntry(value) {
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    return String(value);
+  }
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function setPinGateError(message = "") {
+  if (pinGateError) pinGateError.textContent = message;
+}
+
+async function ensureDevicesAccess(options = {}) {
+  const { prompt = false, tabElement = null, targetView = "devices" } = options;
+  devicesUnlocked = isPinUnlocked();
+  if (devicesUnlocked) return true;
+  if (!prompt) return false;
+  return showPinGate({ targetView, tabElement });
+}
+
+function isDevicesViewActive() {
+  return document.querySelector(".tab.is-active")?.dataset.view === "devices";
+}
+
+function handlePinGateSubmit(event) {
+  event.preventDefault();
+  if (!pinGateInput) return;
+
+  const now = Date.now();
+  const remaining = lockoutRemaining(now);
+  if (remaining > 0) {
+    const seconds = Math.ceil(remaining / 1000);
+    setPinGateError(`Too many attempts. Try again in ${seconds}s.`);
+    return;
+  }
+
+  const attempt = normalizePinEntry(pinGateInput.value);
+  if (!attempt) {
+    setPinGateError("Enter the PIN to continue.");
+    return;
+  }
+
+  if (attempt !== adminPin) {
+    pinAttemptCount += 1;
+    if (pinAttemptCount >= PIN_FAIL_LIMIT) {
+      pinAttemptCount = 0;
+      pinLockedUntil = Date.now() + PIN_LOCK_DURATION;
+      setPinGateError("Too many attempts. Try again in 30s.");
+    } else {
+      setPinGateError("Incorrect PIN. Please try again.");
+    }
+    pinGateInput.value = "";
+    pinGateInput.focus();
+    return;
+  }
+
+  pinAttemptCount = 0;
+  pinLockedUntil = 0;
+  devicesUnlocked = true;
+  setPinGateError("");
+  writeUnlockTimestamp(Date.now());
+  const context = pinGateContext;
+  resolvePinGate(true);
+  if (context) {
+    activateTab(context.tabElement, context.targetView);
+  }
+  renderDevicesView();
+}
+
+function handlePinGateCancel() {
+  const previousView = pinGateContext?.previousView || "home";
+  const previousTab = document.querySelector(`.tab[data-view="${previousView}"]`);
+  resolvePinGate(false);
+  setPinGateError("");
+  if (pinGateInput) pinGateInput.value = "";
+  activateTab(previousTab, previousView);
+}
+
+pinGateForm?.addEventListener("submit", handlePinGateSubmit);
+pinGateInput?.addEventListener("input", () => setPinGateError(""));
+pinGateCancel?.addEventListener("click", handlePinGateCancel);
+
 async function loadData() {
   try {
     const state = await fetchJSON("/api/state");
+    const rawPin = normalizePinEntry(state?.settings?.adminPin ?? "");
+    const nextPin = rawPin || "7777";
+    const pinChanged = adminPin !== nextPin;
+    adminPin = nextPin;
+    if (pinChanged) {
+      devicesUnlocked = false;
+      pinAttemptCount = 0;
+      pinLockedUntil = 0;
+      clearUnlockTimestamp();
+      renderDevicesView();
+    }
     devices = state.devices || [];
     profiles = state.profiles || [
       { id: "default", name: "Default" },
@@ -228,6 +467,20 @@ async function loadData() {
     if (statusPill) {
       statusPill.textContent = "Connected";
       statusPill.className = "pill connected";
+    }
+
+    if (pinChanged) {
+      if (isDevicesViewActive()) {
+        const devicesTab = document.querySelector('.tab[data-view="devices"]');
+        showPinGate({
+          targetView: "devices",
+          tabElement: devicesTab,
+          copy: {
+            title: "PIN Updated",
+            hint: "Enter the new admin PIN to reopen the devices list."
+          }
+        });
+      }
     }
   } catch (error) {
     console.error("Load error:", error);
@@ -332,6 +585,28 @@ function renderHomeView() {
 function renderDevicesView() {
   const deviceList = document.getElementById("deviceList");
   if (!deviceList) return;
+
+  const unlocked = isPinUnlocked();
+  devicesUnlocked = unlocked;
+
+  if (!unlocked) {
+    deviceList.innerHTML = `
+      <div class="devices-locked" role="status">
+        <div class="devices-locked__icon" aria-hidden="true">&#128274;</div>
+        <h3 class="devices-locked__title">Devices locked</h3>
+        <p class="devices-locked__copy">Enter the admin PIN to view and manage your devices.</p>
+        <div class="devices-locked__actions">
+          <button type="button" class="btn btn--primary devices-locked__unlock">Unlock devices</button>
+        </div>
+      </div>
+    `;
+    const unlockBtn = deviceList.querySelector(".devices-locked__unlock");
+    unlockBtn?.addEventListener("click", () => {
+      const devicesTab = document.querySelector('.tab[data-view="devices"]');
+      showPinGate({ targetView: "devices", tabElement: devicesTab });
+    });
+    return;
+  }
   
   if (devices.length === 0) {
     deviceList.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">No devices found</p>';

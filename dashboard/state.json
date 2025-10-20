@@ -39,8 +39,8 @@
       "type": "Laptop — Windows",
       "ip": "192.168.1.42",
       "mac": "AA:BB:CC:DD:EE:42",
-      "enabled": false,
-      "profileId": "prof-default",
+      "enabled": true,
+      "profileId": "prof-focus",
       "lastSeen": "2025-10-19T03:19:18.824Z",
       "pausedUntil": null
     },
@@ -51,7 +51,7 @@
       "ip": "192.168.1.77",
       "mac": "AA:BB:CC:DD:EE:77",
       "enabled": true,
-      "profileId": "prof-nzzfzw",
+      "profileId": "prof-geo2pb",
       "lastSeen": "2025-10-19T03:19:18.824Z",
       "pausedUntil": null
     }
@@ -145,23 +145,6 @@
         }
       ],
       "system": true
-    },
-    {
-      "id": "prof-nzzfzw",
-      "name": "Test",
-      "description": "",
-      "blockPorn": false,
-      "blockGambling": false,
-      "blockTrackers": false,
-      "blockSocial": true,
-      "socialSites": [
-        "twitter.com"
-      ],
-      "customEnabled": false,
-      "blockList": [],
-      "allowList": [],
-      "timeRules": [],
-      "system": false
     }
   ],
   "schedules": [
@@ -283,7 +266,8 @@
     "dns": "quad9",
     "dnsCustom": "",
     "admin": "Mischa",
-    "familyLock": true
+    "familyLock": true,
+    "adminPin": "7777"
   },
   "extensionBinding": "dev-mischa",
   "enabledGlobal": true,

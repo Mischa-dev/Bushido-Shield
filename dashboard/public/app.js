@@ -2,6 +2,27 @@ const API = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undef
 console.log('🛡️ Bushido Shield Options - Version: 2024-10-18-PROFILE-EDITOR-COMPLETE');
 // @@CHUNK1
 const toastRoot = document.getElementById('toast');
+const appRoot = document.querySelector('.app');
+const pinOverlay = document.getElementById('pinOverlay');
+const pinForm = document.getElementById('pinForm');
+const pinInput = document.getElementById('pinInput');
+const pinError = document.getElementById('pinError');
+const pinChangeForm = document.getElementById('pinChangeForm');
+const pinChangeCurrent = document.getElementById('pinChangeCurrent');
+const pinChangeNew = document.getElementById('pinChangeNew');
+const pinChangeConfirm = document.getElementById('pinChangeConfirm');
+const pinChangeFeedback = document.getElementById('pinChangeFeedback');
+const pinChangeSuccess = document.getElementById('pinChangeSuccess');
+
+const PIN_UNLOCK_STORAGE_KEY = 'bs:adminUnlockTs';
+const PIN_UNLOCK_TTL = 60000;
+const PIN_FAIL_LIMIT = 5;
+const PIN_LOCK_DURATION = 30000;
+
+let adminPin = '7777';
+let pinAttemptCount = 0;
+let pinLockedUntil = 0;
+let pinUnlockResolvers = [];
 function toast(msg) {
   if (!toastRoot) return;
   const el = document.createElement('div');
@@ -10,6 +31,223 @@ function toast(msg) {
   toastRoot.appendChild(el);
   setTimeout(() => el.remove(), 2400);
 }
+
+function setAppLockState(locked) {
+  if (!appRoot) return;
+  if (locked) {
+    appRoot.classList.add('is-locked');
+    appRoot.setAttribute('inert', '');
+    document.body.classList.add('pin-locked');
+  } else {
+    appRoot.classList.remove('is-locked');
+    appRoot.removeAttribute('inert');
+    document.body.classList.remove('pin-locked');
+  }
+}
+
+function isPinOverlayOpen() {
+  return !!pinOverlay?.classList.contains('is-open');
+}
+
+function showPinError(message = '') {
+  if (pinError) {
+    pinError.textContent = message;
+  }
+}
+
+function readPinUnlockTs() {
+  if (!window?.localStorage) return 0;
+  try {
+    return Number(window.localStorage.getItem(PIN_UNLOCK_STORAGE_KEY) || '0');
+  } catch (_) {
+    return 0;
+  }
+}
+
+function writePinUnlockTs(ts) {
+  if (!window?.localStorage) return;
+  try {
+    window.localStorage.setItem(PIN_UNLOCK_STORAGE_KEY, String(ts));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function clearPinUnlockTs() {
+  if (!window?.localStorage) return;
+  try {
+    window.localStorage.removeItem(PIN_UNLOCK_STORAGE_KEY);
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function requiresPinPrompt() {
+  const last = readPinUnlockTs();
+  if (!last) return true;
+  return Date.now() - last > PIN_UNLOCK_TTL;
+}
+
+function openPinOverlay(message) {
+  if (!pinOverlay) return;
+  setAppLockState(true);
+  pinOverlay.classList.add('is-open');
+  pinOverlay.setAttribute('aria-hidden', 'false');
+  if (typeof message === 'string') {
+    showPinError(message);
+  } else {
+    showPinError('');
+  }
+  if (pinInput) {
+    pinInput.value = '';
+    requestAnimationFrame(() => pinInput.focus());
+  }
+}
+
+function closePinOverlay() {
+  if (!pinOverlay) return;
+  pinOverlay.classList.remove('is-open');
+  pinOverlay.setAttribute('aria-hidden', 'true');
+  showPinError('');
+  setAppLockState(false);
+  if (pinInput) pinInput.value = '';
+}
+
+function resolvePinUnlock(result) {
+  if (!pinUnlockResolvers.length) return;
+  const resolvers = pinUnlockResolvers.slice();
+  pinUnlockResolvers = [];
+  resolvers.forEach((fn) => {
+    try { fn(result); } catch (_) { /* noop */ }
+  });
+}
+
+function waitForPinEntry() {
+  return new Promise((resolve) => {
+    pinUnlockResolvers.push(resolve);
+  });
+}
+
+function lockoutRemaining(now = Date.now()) {
+  if (!pinLockedUntil) return 0;
+  return Math.max(0, pinLockedUntil - now);
+}
+
+function handlePinSubmit(event) {
+  event.preventDefault();
+  if (!pinInput) return;
+
+  const now = Date.now();
+  const remainingLock = lockoutRemaining(now);
+  if (remainingLock > 0) {
+    const seconds = Math.ceil(remainingLock / 1000);
+    showPinError(`Too many attempts. Try again in ${seconds}s.`);
+    return;
+  }
+
+  const attempt = pinInput.value.trim();
+  if (!attempt) {
+    showPinError('Enter the PIN to continue.');
+    return;
+  }
+
+  if (attempt !== adminPin) {
+    pinAttemptCount += 1;
+    if (pinAttemptCount >= PIN_FAIL_LIMIT) {
+      pinAttemptCount = 0;
+      pinLockedUntil = Date.now() + PIN_LOCK_DURATION;
+      showPinError('Too many attempts. Try again in 30s.');
+    } else {
+      showPinError('Incorrect PIN. Please try again.');
+    }
+    pinInput.value = '';
+    pinInput.focus();
+    return;
+  }
+
+  pinAttemptCount = 0;
+  pinLockedUntil = 0;
+  showPinError('');
+  writePinUnlockTs(Date.now());
+  closePinOverlay();
+  resolvePinUnlock(true);
+}
+
+function promptForPinIfNeeded() {
+  if (!pinOverlay) return Promise.resolve(true);
+  if (requiresPinPrompt()) {
+    if (!isPinOverlayOpen()) {
+      openPinOverlay();
+    } else {
+      setAppLockState(true);
+      showPinError('');
+      if (pinInput) {
+        requestAnimationFrame(() => pinInput.focus());
+      }
+    }
+    return waitForPinEntry();
+  }
+  closePinOverlay();
+  return Promise.resolve(true);
+}
+
+function deriveAdminPinFromState(state) {
+  const raw = state?.['bs:settings']?.adminPin;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  if (typeof raw === 'number' && !Number.isNaN(raw)) return String(raw);
+  return '7777';
+}
+
+function normalizePinEntry(value) {
+  if (typeof value === 'number' && !Number.isNaN(value)) {
+    return String(value);
+  }
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim();
+}
+
+function isValidPinFormat(pin) {
+  return /^[0-9]{4,12}$/.test(pin);
+}
+
+function checkPinExpiry() {
+  if (!pinOverlay) return;
+  if (requiresPinPrompt()) {
+    if (!isPinOverlayOpen()) {
+      openPinOverlay();
+    }
+    pinUnlockResolvers = [];
+  }
+}
+
+function resetPinChangeMessages() {
+  if (pinChangeFeedback) pinChangeFeedback.textContent = '';
+  if (pinChangeSuccess) pinChangeSuccess.textContent = '';
+}
+
+pinForm?.addEventListener('submit', handlePinSubmit);
+pinInput?.addEventListener('input', () => showPinError(''));
+[pinChangeCurrent, pinChangeNew, pinChangeConfirm].forEach((input) => {
+  input?.addEventListener('input', resetPinChangeMessages);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkPinExpiry();
+  }
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key === PIN_UNLOCK_STORAGE_KEY) {
+    checkPinExpiry();
+  }
+});
+
+window.addEventListener('focus', () => {
+  checkPinExpiry();
+});
 
 // Topbar
 const statusPill = document.getElementById('statusPill');
@@ -554,7 +792,7 @@ async function seedIfNeeded() {
   const schedules = [ { id:'sch-1', target:{ type:'device', id:'dev-pixel' }, rules:[{ days:['Mon','Tue','Wed','Thu'], start:'21:00', end:'07:00' }] } ];
   const filters = { blocklists:[ { id:'bl-1', name:'OISD Basic', source:'https://oisd.nl/basic.txt', enabled:true, lastSync: nowISO() }, { id:'bl-2', name:'HaGeZi Multi', source:'https://example/hagezi.txt', enabled:true, lastSync: nowISO() } ], allowlist:['school.edu','docs.google.com'], customRules:['||doubleclick.net^','@@||youtube.com^$document'] };
   const logs = [ { time: nowISO(), domain:'doubleclick.net', action:'blocked', device:'MischxLaptop' }, { time: nowISO(), domain:'docs.google.com', action:'allowed', device:'MischxLaptop' }, { time: nowISO(), domain:'youtube.com', action:'policy', device:'Pixel 6 Pro' } ];
-  const settings = { dns:'quad9', dnsCustom:'', admin:'', familyLock:true };
+  const settings = { dns:'quad9', dnsCustom:'', admin:'', familyLock:true, adminPin:'7777' };
   await set({ 'bs:devices': devices, 'bs:profiles': profiles, 'bs:schedules': schedules, 'bs:filters': filters, 'bs:enabled:global': true, 'bs:activeProfile': 'prof-default', 'bs:lastSync': nowISO(), 'bs:settings': settings, 'bs:logs': logs });
 }
 
@@ -607,6 +845,61 @@ familyLock?.addEventListener('change', async ()=>{
   const active = document.querySelector('.seg .tab.active');
   if (active?.classList.contains('adv') && familyLock.checked) showPage('tab-main');
   toast(familyLock.checked ? 'Family Mode enabled' : 'Family Mode disabled');
+});
+
+pinChangeForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!pinChangeCurrent || !pinChangeNew || !pinChangeConfirm) return;
+
+  resetPinChangeMessages();
+
+  const current = normalizePinEntry(pinChangeCurrent.value);
+  const next = normalizePinEntry(pinChangeNew.value);
+  const confirm = normalizePinEntry(pinChangeConfirm.value);
+
+  if (current !== adminPin) {
+    if (pinChangeFeedback) pinChangeFeedback.textContent = 'Current PIN is incorrect.';
+    pinChangeCurrent.focus();
+    return;
+  }
+
+  if (!isValidPinFormat(next)) {
+    if (pinChangeFeedback) pinChangeFeedback.textContent = 'PIN must be 4-12 digits.';
+    pinChangeNew.focus();
+    return;
+  }
+
+  if (next !== confirm) {
+    if (pinChangeFeedback) pinChangeFeedback.textContent = 'New PIN entries do not match.';
+    pinChangeConfirm.focus();
+    return;
+  }
+
+  if (current === next) {
+    if (pinChangeFeedback) pinChangeFeedback.textContent = 'Choose a PIN that differs from the current one.';
+    pinChangeNew.focus();
+    return;
+  }
+
+  try {
+    const state = await loadState();
+    const settings = { ...(state['bs:settings'] || {}), adminPin: next };
+    await set({ 'bs:settings': settings });
+    adminPin = next;
+    pinAttemptCount = 0;
+    pinLockedUntil = 0;
+    clearPinUnlockTs();
+    if (pinChangeSuccess) pinChangeSuccess.textContent = 'Admin PIN updated. Unlock with the new PIN.';
+    pinChangeCurrent.value = '';
+    pinChangeNew.value = '';
+    pinChangeConfirm.value = '';
+    pinUnlockResolvers = [];
+    openPinOverlay('Admin PIN updated. Enter the new PIN to continue.');
+    toast('Admin PIN updated');
+  } catch (error) {
+    console.error('Failed to update Admin PIN', error);
+    if (pinChangeFeedback) pinChangeFeedback.textContent = 'Failed to update PIN. Please try again.';
+  }
 });
 
 // Device Binding Controls
@@ -1755,9 +2048,9 @@ exportProfilesBtn?.addEventListener('click', async ()=>{ const st=await loadStat
 importProfilesInput?.addEventListener('change', async (e)=>{ const f=e.target.files[0]; if (!f) return; try { const txt=await f.text(); const arr=JSON.parse(txt); if (!Array.isArray(arr)) throw new Error('Invalid'); await set({'bs:profiles':arr}); toast('✓ Profiles imported'); renderProfiles(await loadState()); } catch { toast('❌ Invalid JSON'); } finally { importProfilesInput.value=''; } });
 
 // @@CHUNK10
-function renderSettings(state){ const st=state['bs:settings']||{dns:'quad9',dnsCustom:'',admin:'',familyLock:true}; if (setDns) setDns.value=st.dns||'quad9'; if (setDnsCustom) setDnsCustom.value=st.dnsCustom||''; if (setDnsCustomWrap) setDnsCustomWrap.style.display = (setDns?.value==='custom') ? 'block':'none'; if (setAdmin) setAdmin.value=st.admin||''; if (familyLock) familyLock.checked = !!st.familyLock; }
+function renderSettings(state){ const st=state['bs:settings']||{dns:'quad9',dnsCustom:'',admin:'',familyLock:true,adminPin:'7777'}; adminPin = deriveAdminPinFromState(state); if (setDns) setDns.value=st.dns||'quad9'; if (setDnsCustom) setDnsCustom.value=st.dnsCustom||''; if (setDnsCustomWrap) setDnsCustomWrap.style.display = (setDns?.value==='custom') ? 'block':'none'; if (setAdmin) setAdmin.value=st.admin||''; if (familyLock) familyLock.checked = !!st.familyLock; }
 setDns?.addEventListener('change', ()=>{ if (setDnsCustomWrap) setDnsCustomWrap.style.display = setDns.value==='custom' ? 'block':'none'; });
-settingsSave?.addEventListener('click', async ()=>{ const st=await loadState(); const next={ ...(st['bs:settings']||{}), dns:setDns?.value||'quad9', dnsCustom:setDnsCustom?.value?.trim()||'', admin:setAdmin?.value||'' }; await set({'bs:settings': next}); toast('Settings saved'); });
+settingsSave?.addEventListener('click', async ()=>{ const st=await loadState(); const next={ ...(st['bs:settings']||{}), dns:setDns?.value||'quad9', dnsCustom:setDnsCustom?.value?.trim()||'', admin:setAdmin?.value||'' }; await set({'bs:settings': next}); const updatedPin = normalizePinEntry(next.adminPin ?? adminPin); adminPin = updatedPin || adminPin; toast('Settings saved'); });
 
 function renderBlocklists(state){ const lists=state['bs:filters']?.blocklists||[]; blTable.innerHTML=''; lists.forEach((bl,idx)=>{ const tr=document.createElement('tr'); const td1=document.createElement('td'); td1.textContent=bl.name; tr.appendChild(td1); const td2=document.createElement('td'); td2.textContent=bl.source; tr.appendChild(td2); const td3=document.createElement('td'); const chk=document.createElement('input'); chk.type='checkbox'; chk.checked=!!bl.enabled; chk.addEventListener('change', async ()=>{ lists[idx].enabled=chk.checked; const st=await loadState(); await set({'bs:filters':{...st['bs:filters'], blocklists:lists}}); toast(`${bl.name} ${chk.checked?'enabled':'disabled'}`); }); td3.appendChild(chk); tr.appendChild(td3); const td4=document.createElement('td'); td4.textContent=bl.lastSync? fmtTime(bl.lastSync):'—'; tr.appendChild(td4); blTable.appendChild(tr); }); }
 function renderAllowlist(state){ const al=state['bs:filters']?.allowlist||[]; alChips.innerHTML=''; al.forEach((host,idx)=>{ const c=document.createElement('span'); c.className='chip'; c.textContent=host; const x=document.createElement('button'); x.className='chip'; x.textContent='×'; x.addEventListener('click', async ()=>{ al.splice(idx,1); const st=await loadState(); await set({'bs:filters':{...st['bs:filters'], allowlist:al}}); toast('Removed'); renderAllowlist(await loadState()); }); c.appendChild(x); alChips.appendChild(c); }); }
@@ -1857,8 +2150,12 @@ function renderRequests(state, filter='all'){
 requestsFilters?.addEventListener('click', async (e)=>{ const f=e.target?.dataset?.f; if(!f) return; document.querySelectorAll('#requestsFilters .chip').forEach(c=>c.classList.remove('is-selected')); e.target.classList.add('is-selected'); renderRequests(await loadState(), f); });
 requestSearch?.addEventListener('input', async ()=>{ renderRequests(await loadState()); });
 
-(async function init(){
-  const st = await loadState();
+(async function bootstrap(){
+  let st = await loadState();
+  adminPin = deriveAdminPinFromState(st);
+  await promptForPinIfNeeded();
+  st = await loadState();
+  adminPin = deriveAdminPinFromState(st);
   enforceFamilyMode(st);
   updateTopbar(st);
   updateMetrics(st);

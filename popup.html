@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -109,6 +109,28 @@
           <button id="openDashboard" class="btn-link">Open full dashboard -></button>
         </div>
       </section>
+
+      <section id="view-pin-gate" class="view" role="tabpanel" aria-hidden="true">
+        <div class="panel panel--pin-gate">
+          <div class="pin-gate">
+            <div class="pin-gate__card">
+              <div class="pin-gate__lock" aria-hidden="true">&#128274;</div>
+              <h2 id="pinGateTitle" class="pin-gate__title">Admin PIN Required</h2>
+              <p id="pinGateHint" class="pin-gate__hint">Enter the admin PIN to continue.</p>
+              <form id="pinGateForm" class="pin-gate__form" autocomplete="off">
+                <label class="pin-gate__label" for="pinGateInput">Admin PIN</label>
+                <input id="pinGateInput" class="pin-gate__input" type="password" inputmode="numeric" minlength="4" maxlength="12" required placeholder="Enter PIN" />
+                <p id="pinGateError" class="pin-gate__error" role="alert" aria-live="assertive"></p>
+                <div class="pin-gate__actions">
+                  <button type="button" id="pinGateCancel" class="btn btn--ghost">Back</button>
+                  <button type="submit" class="btn btn--primary">Unlock</button>
+                </div>
+              </form>
+              <p class="pin-gate__note">Unlocked access lasts one minute before the devices view locks again.</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="footer">
@@ -121,6 +143,6 @@
     <div id="toastRoot" class="toast-root"></div>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="popup.js" type="module"></script>
 </body>
 </html>

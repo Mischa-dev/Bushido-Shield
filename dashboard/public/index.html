@@ -50,6 +50,17 @@
     }
     *{box-sizing:border-box;}
     body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--font);min-height:100vh;}
+    body.pin-locked{overflow:hidden;}
+    .app.is-locked{filter:blur(4px);pointer-events:none;user-select:none;}
+    .pin-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:200;padding:var(--space-6);}
+    .pin-overlay.is-open{display:flex;}
+    .pin-dialog{background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--r-card);box-shadow:var(--shadow-2);padding:var(--space-6);max-width:420px;width:100%;display:flex;flex-direction:column;gap:var(--space-4);}
+    .pin-dialog__form{display:flex;flex-direction:column;gap:var(--space-3);}
+    .pin-dialog__inputs{display:flex;flex-direction:column;gap:var(--space-2);}
+    .pin-dialog__error{color:var(--danger);font:600 13px var(--font);min-height:18px;}
+    .pin-dialog__hint{font:500 13px var(--font);color:rgba(15,23,42,.65);margin:0;}
+    .pin-dialog__title{margin:0;}
+  .pin-dialog__success{color:var(--success);font:600 13px var(--font);min-height:18px;}
     img{max-width:100%;display:block;}
     a{color:var(--info);text-decoration:none;}
     a:hover{text-decoration:underline;}
@@ -261,8 +272,24 @@
     }
   </style>
 </head>
-<body>
-  <div class="app">
+<body class="pin-locked">
+  <div id="pinOverlay" class="pin-overlay is-open" aria-hidden="false">
+    <div class="pin-dialog" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
+      <h2 id="pinModalTitle" class="h2 pin-dialog__title">Enter Admin PIN</h2>
+      <p class="pin-dialog__hint">This keeps the dashboard locked for kids.</p>
+      <form id="pinForm" class="pin-dialog__form" autocomplete="off">
+        <div class="pin-dialog__inputs">
+          <label class="label" for="pinInput">Admin PIN</label>
+          <input id="pinInput" class="input" type="password" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="12" required placeholder="Enter PIN" />
+        </div>
+        <p id="pinError" class="pin-dialog__error" role="alert" aria-live="assertive"></p>
+        <div style="display:flex;gap:var(--space-3);justify-content:flex-end;">
+          <button type="submit" class="btn btn--primary">Unlock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="app is-locked">
     <header class="hero">
       <div class="brand">
         <img src="bushido_shield_logo.svg" alt="Bushido Shield logo" class="brand__logo" />
@@ -846,6 +873,34 @@
             </label>
             <p class="muted" style="margin-top:var(--space-3);font-size:13px;">When enabled, advanced controls are tucked away for younger users. A lock badge will appear in the header.</p>
           </div>
+        </div>
+
+        <!-- Security / Admin PIN -->
+        <div class="panel" style="padding:var(--space-5);">
+          <div class="panel__header" style="margin-bottom:0;">
+            <span class="label">Security</span>
+            <h3 class="h2" style="font-size:18px;">Change Admin PIN</h3>
+            <p class="muted" style="margin-top:var(--space-2);">Update the PIN required for the dashboard and extension devices view.</p>
+          </div>
+          <form id="pinChangeForm" class="pin-dialog__form" style="margin-top:var(--space-4);">
+            <div class="field">
+              <label class="label" for="pinChangeCurrent">Current PIN</label>
+              <input id="pinChangeCurrent" class="input" type="password" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="12" required />
+            </div>
+            <div class="field">
+              <label class="label" for="pinChangeNew">New PIN</label>
+              <input id="pinChangeNew" class="input" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" maxlength="12" required />
+            </div>
+            <div class="field">
+              <label class="label" for="pinChangeConfirm">Confirm New PIN</label>
+              <input id="pinChangeConfirm" class="input" type="password" inputmode="numeric" autocomplete="off" minlength="4" maxlength="12" required />
+            </div>
+            <p id="pinChangeFeedback" class="pin-dialog__error" role="alert" aria-live="assertive"></p>
+            <div id="pinChangeSuccess" class="pin-dialog__success" aria-live="polite"></div>
+            <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-3);">
+              <button type="submit" class="btn btn--primary">Update PIN</button>
+            </div>
+          </form>
         </div>
 
         <!-- Additional advanced settings can go here in future -->

@@ -192,7 +192,8 @@ function createDefaultState() {
       dns: 'quad9',
       dnsCustom: '',
       admin: 'Mischa',
-      familyLock: true
+      familyLock: true,
+      adminPin: '7777'
     },
     extensionBinding: null,
     enabledGlobal: true,
@@ -230,6 +231,12 @@ function normalizeState(input = {}) {
     logs: Array.isArray(input.logs) ? input.logs : defaults.logs,
     settings: { ...defaults.settings, ...(input.settings || {}) }
   };
+  if (state.settings) {
+    if (typeof state.settings.adminPin === 'undefined' || state.settings.adminPin === null) {
+      state.settings.adminPin = defaults.settings.adminPin;
+    }
+    state.settings.adminPin = String(state.settings.adminPin).trim() || defaults.settings.adminPin;
+  }
   return state;
 }
 
