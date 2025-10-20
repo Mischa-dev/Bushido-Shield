@@ -18,6 +18,7 @@ const PIN_UNLOCK_STORAGE_KEY = 'bs:adminUnlockTs';
 const PIN_UNLOCK_TTL = 60000;
 const PIN_FAIL_LIMIT = 5;
 const PIN_LOCK_DURATION = 30000;
+const PIN_LAST_HIDDEN_KEY = 'bs:dashboardLastHidden';
 
 let adminPin = '7777';
 let pinAttemptCount = 0;
@@ -85,7 +86,42 @@ function clearPinUnlockTs() {
 function requiresPinPrompt() {
   const last = readPinUnlockTs();
   if (!last) return true;
+  
+  // Check if tab was hidden for more than PIN_UNLOCK_TTL
+  const lastHidden = readLastHiddenTime();
+  if (lastHidden && Date.now() - lastHidden > PIN_UNLOCK_TTL) {
+    return true;
+  }
+  
+  // Otherwise, check elapsed time since unlock
   return Date.now() - last > PIN_UNLOCK_TTL;
+}
+
+function readLastHiddenTime() {
+  if (!window?.localStorage) return 0;
+  try {
+    return Number(window.localStorage.getItem(PIN_LAST_HIDDEN_KEY) || '0');
+  } catch (_) {
+    return 0;
+  }
+}
+
+function writeLastHiddenTime(ts) {
+  if (!window?.localStorage) return;
+  try {
+    window.localStorage.setItem(PIN_LAST_HIDDEN_KEY, String(ts));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function clearLastHiddenTime() {
+  if (!window?.localStorage) return;
+  try {
+    window.localStorage.removeItem(PIN_LAST_HIDDEN_KEY);
+  } catch (_) {
+    // ignore storage failures
+  }
 }
 
 function openPinOverlay(message) {
@@ -169,6 +205,7 @@ function handlePinSubmit(event) {
   pinLockedUntil = 0;
   showPinError('');
   writePinUnlockTs(Date.now());
+  clearLastHiddenTime();
   closePinOverlay();
   resolvePinUnlock(true);
 }
@@ -236,6 +273,9 @@ pinInput?.addEventListener('input', () => showPinError(''));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     checkPinExpiry();
+  } else {
+    // Tab is now hidden, record the time
+    writeLastHiddenTime(Date.now());
   }
 });
 

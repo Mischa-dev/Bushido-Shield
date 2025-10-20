@@ -25,6 +25,7 @@ const PIN_FAIL_LIMIT = 5;
 const PIN_LOCK_DURATION = 30000;
 const PIN_UNLOCK_KEY = "bs:adminUnlockTs";
 const PIN_UNLOCK_TTL = 60000;
+const POPUP_LAST_CLOSED_KEY = "bs:popupLastClosed";
 
 const pinGateView = document.getElementById("view-pin-gate");
 const pinGateForm = document.getElementById("pinGateForm");
@@ -42,6 +43,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadQuickState().catch(() => {});
   await loadData();
   render();
+});
+
+// Track when popup closes to enforce re-authentication after 60 seconds
+window.addEventListener("blur", () => {
+  const now = Date.now();
+  if (window?.localStorage) {
+    window.localStorage.setItem(POPUP_LAST_CLOSED_KEY, String(now));
+  }
+});
+
+window.addEventListener("focus", () => {
+  if (!window?.localStorage) return;
+  const lastClosed = Number(window.localStorage.getItem(POPUP_LAST_CLOSED_KEY)) || 0;
+  const now = Date.now();
+  
+  // If popup was closed for more than 60 seconds, clear the PIN unlock
+  if (lastClosed && now - lastClosed > PIN_UNLOCK_TTL) {
+    clearUnlockTimestamp();
+    devicesUnlocked = false;
+    render();
+  }
 });
 
 function setupEventListeners() {

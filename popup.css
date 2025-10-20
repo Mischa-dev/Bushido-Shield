@@ -27,7 +27,7 @@
 * { box-sizing: border-box; }
 
 html, body {
-  width: 360px;
+  width: 400px;
   height: 560px;
   margin: 0;
   background: var(--bg);
@@ -855,8 +855,9 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-1);
-  padding: 28px 24px;
-  width: min(320px, 100%);
+  padding: 28px 20px;
+  width: 100%;
+  max-width: 100%;
   display: grid;
   gap: 16px;
   text-align: center;
