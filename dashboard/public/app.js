@@ -1399,6 +1399,19 @@ async function renderDevices(state){
       renderQuickDevicesOverview(freshState); 
     }); tdProf.appendChild(sel);
     
+    const tdAccess=document.createElement('td'); 
+    const accessSel=document.createElement('select'); 
+    accessSel.style.fontSize='12px';
+    const adminOpt=document.createElement('option'); adminOpt.value='admin'; adminOpt.textContent='Admin';
+    const userOpt=document.createElement('option'); userOpt.value='user'; userOpt.textContent='User';
+    accessSel.append(adminOpt, userOpt); 
+    accessSel.value=d.accessLevel||'admin'; 
+    accessSel.addEventListener('change', async ()=>{ 
+      await updateDevice(d.id, { accessLevel: accessSel.value });
+      toast(`Access level set to ${accessSel.value === 'admin' ? 'Admin' : 'User'} for ${d.name}`); 
+    }); 
+    tdAccess.appendChild(accessSel);
+    
     const tdPause=document.createElement('td'); 
     const isPaused = d.pausedUntil && new Date(d.pausedUntil) > new Date();
     if (isPaused) {
@@ -1451,7 +1464,7 @@ async function renderDevices(state){
     }
     
     const tdSeen=document.createElement('td'); tdSeen.textContent=fmtTime(d.lastSeen);
-    tr.append(tdSel, tdName, tdNet, tdEn, tdProf, tdPause, tdSeen); deviceTable.appendChild(tr);
+    tr.append(tdSel, tdName, tdNet, tdEn, tdProf, tdAccess, tdPause, tdSeen); deviceTable.appendChild(tr);
   });
   selectAll?.addEventListener('change', ()=>{ const inputs=deviceTable.querySelectorAll('input[type="checkbox"]'); inputs.forEach((i,idx)=>{ if (idx===0) return; i.checked = selectAll.checked; const dev=list[idx-1]; if (selectAll.checked) selected.add(dev.id); else selected.delete(dev.id); }); });
   bulkToggle?.addEventListener('click', async ()=>{ 

@@ -78,6 +78,8 @@
   .pill{display:inline-flex;align-items:center;gap:.5ch;padding:.35rem .9rem;border-radius:var(--r-pill);border:1px solid var(--border);background:#fff;font:600 13px/1 var(--font);}
   .pill--ok,.pill.connected{background:color-mix(in srgb,#fff 90%, var(--success) 10%);border-color:color-mix(in srgb,var(--success) 40%, #fff 60%);}
   .pill--paused,.pill.paused{background:var(--t-alert);border-color:color-mix(in srgb, var(--danger) 40%, #fff 60%);}
+  .pill--admin{background:color-mix(in srgb,#fff 88%, var(--brand) 12%);border-color:color-mix(in srgb, var(--brand) 50%, #fff 50%);color:var(--brand);}
+  .pill--user{background:color-mix(in srgb,#fff 90%, var(--info) 10%);border-color:color-mix(in srgb, var(--info) 40%, #fff 60%);color:var(--info);}
     .btn{appearance:none;border-radius:var(--r-ctl);padding:.6rem .9rem;font:600 14px var(--font);border:1px solid var(--border);background:#fff;color:var(--ink);cursor:pointer;transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease);}
     .btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-1);}
     .btn:focus{outline:3px solid var(--ring);outline-offset:2px;}
@@ -487,6 +489,7 @@
                     <th scope="col">IP / MAC</th>
                     <th scope="col">Shield</th>
                     <th scope="col">Profile</th>
+                    <th scope="col">Access</th>
                     <th scope="col">Pause</th>
                     <th scope="col">Last seen</th>
                   </tr>

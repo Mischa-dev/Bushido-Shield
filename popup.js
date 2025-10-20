@@ -27,6 +27,33 @@ const PIN_UNLOCK_KEY = "bs:adminUnlockTs";
 const PIN_UNLOCK_TTL = 60000;
 const POPUP_LAST_CLOSED_KEY = "bs:popupLastClosed";
 
+// Access control - now per-device, not global
+function getDeviceAccessLevel() {
+  // Get the bound device's access level
+  if (boundDeviceId && Array.isArray(devices)) {
+    const boundDevice = devices.find(d => d.id === boundDeviceId);
+    return boundDevice?.accessLevel || 'admin';
+  }
+  return 'admin'; // Default to admin if not bound
+}
+
+function isUserLevel() {
+  return getDeviceAccessLevel() === 'user';
+}
+
+function applyAccessLevelUI() {
+  const isUser = isUserLevel();
+  const devicesTab = document.querySelector('.tab[data-view="devices"]');
+  
+  if (devicesTab) {
+    if (isUser) {
+      devicesTab.style.display = 'none';
+    } else {
+      devicesTab.style.display = '';
+    }
+  }
+}
+
 const pinGateView = document.getElementById("view-pin-gate");
 const pinGateForm = document.getElementById("pinGateForm");
 const pinGateInput = document.getElementById("pinGateInput");
@@ -37,6 +64,7 @@ const pinGateHint = document.getElementById("pinGateHint");
 
 document.addEventListener("DOMContentLoaded", async () => {
   devicesUnlocked = isPinUnlocked();
+  applyAccessLevelUI(); // Apply access level restrictions to UI
   setupEventListeners();
   await hydrateFromCache();
   renderHomeView();
@@ -105,6 +133,12 @@ function setupEventListeners() {
     tab.addEventListener("click", async (event) => {
       event.preventDefault();
       const viewName = tab.dataset.view;
+
+      // Block Devices tab for User access level
+      if (viewName === "devices" && isUserLevel()) {
+        showToast('⚠️ Devices tab requires Admin access', 'error');
+        return;
+      }
 
       if (viewName === "devices") {
         const ok = await ensureDevicesAccess({ prompt: true, tabElement: tab, targetView: "devices" });
@@ -212,6 +246,12 @@ function setupEventListeners() {
 
 function activateTab(tabElement, viewName, overrideView) {
   const target = viewName || tabElement?.dataset?.view || "home";
+
+  // Block Devices tab for User access level
+  if (target === "devices" && !overrideView && isUserLevel()) {
+    showToast('⚠️ Devices tab requires Admin access', 'error');
+    return;
+  }
 
   if (target === "devices" && !overrideView && !isPinUnlocked()) {
     const tabRef = tabElement || document.querySelector('.tab[data-view="devices"]');
@@ -517,6 +557,7 @@ async function loadData() {
 function render() {
   renderHomeView();
   renderDevicesView();
+  applyAccessLevelUI(); // Apply access level restrictions based on bound device
   savePopupCache();
 }
 

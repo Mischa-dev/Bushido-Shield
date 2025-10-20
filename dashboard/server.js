@@ -22,7 +22,8 @@ function createDefaultState() {
         enabled: true,
         profileId: 'prof-default',
         lastSeen: now,
-        pausedUntil: null
+        pausedUntil: null,
+        accessLevel: 'admin'
       },
       {
         id: 'dev-bushido-02',
@@ -33,7 +34,8 @@ function createDefaultState() {
         enabled: true,
         profileId: 'prof-focus',
         lastSeen: now,
-        pausedUntil: null
+        pausedUntil: null,
+        accessLevel: 'admin'
       },
       {
         id: 'dev-bushido-leaf',
@@ -44,7 +46,8 @@ function createDefaultState() {
         enabled: true,
         profileId: 'prof-school',
         lastSeen: now,
-        pausedUntil: null
+        pausedUntil: null,
+        accessLevel: 'user'
       },
       {
         id: 'dev-mischa',
@@ -55,7 +58,8 @@ function createDefaultState() {
         enabled: true,
         profileId: 'prof-default',
         lastSeen: now,
-        pausedUntil: null
+        pausedUntil: null,
+        accessLevel: 'admin'
       },
       {
         id: 'dev-pixel',
@@ -66,7 +70,8 @@ function createDefaultState() {
         enabled: false,
         profileId: 'prof-focus',
         lastSeen: now,
-        pausedUntil: null
+        pausedUntil: null,
+        accessLevel: 'user'
       }
     ],
     profiles: [
