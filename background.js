@@ -149,7 +149,7 @@ async function setState(next) {
 
 function getHostFromOrigin(origin) {
   try {
-    return new URL(origin).host;
+    return new URL(origin).hostname;
   } catch (e) {
     return null;
   }
